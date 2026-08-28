@@ -23,12 +23,14 @@ def button_texts(markup) -> list[str]:
 def test_calculators_are_grouped_by_stage() -> None:
     markup = calculators_menu_keyboard()
 
-    assert button_texts(markup)[:2] == [
+    assert button_texts(markup)[:3] == [
         "🧰 Подготовка браги",
+        "🫧 Брожение",
         "⚗️ Первая перегонка",
     ]
-    assert button_callbacks(markup)[:2] == [
+    assert button_callbacks(markup)[:3] == [
         "calculators:preparation",
+        "calculators:fermentation",
         "calculators:first-distillation",
     ]
 
