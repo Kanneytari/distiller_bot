@@ -68,12 +68,39 @@ MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
 
 DEFAULT_MEASUREMENT_ORDER = ["temperature", "density", "abv", "volume"]
 STAGE_MEASUREMENT_ORDER: dict[str, list[str]] = {
-    "Подготовка": ["volume", "temperature", "density", "abv"],
+    "Подготовка": ["volume", "density", "temperature", "abv"],
     "Брожение": ["density", "temperature", "volume", "abv"],
     "Перегонка": ["abv", "volume", "temperature", "density"],
     "Разбавление": ["abv", "volume", "temperature", "density"],
     "Выдержка": ["abv", "volume", "temperature", "density"],
     "Готово": ["abv", "volume", "temperature", "density"],
+}
+
+STAGE_QUICK_MEASUREMENTS: dict[str, list[tuple[str, str]]] = {
+    "Подготовка": [
+        ("volume", "💧 Объём"),
+        ("density", "📏 Начальная плотность"),
+    ],
+    "Брожение": [
+        ("density", "📏 Плотность"),
+        ("temperature", "🌡 Температура"),
+    ],
+    "Перегонка": [
+        ("abv", "🥃 Крепость"),
+        ("volume", "💧 Объём"),
+    ],
+    "Разбавление": [
+        ("abv", "🥃 Текущая крепость"),
+        ("volume", "💧 Объём"),
+    ],
+    "Выдержка": [
+        ("abv", "🥃 Крепость"),
+        ("volume", "💧 Объём"),
+    ],
+    "Готово": [
+        ("abv", "🥃 Итоговая крепость"),
+        ("volume", "💧 Итоговый объём"),
+    ],
 }
 
 VALUE_RE = re.compile(r"^\s*([+-]?\d+(?:[.,]\d+)?)\s*(.*?)\s*$")
@@ -120,6 +147,10 @@ def measurement_display(measurement: Measurement) -> str:
     return f"{icon} {escape(label)}: {format_decimal(measurement.value)}{unit}"
 
 
+def quick_measurements_for_stage(stage: str | None) -> list[tuple[str, str]]:
+    return list(STAGE_QUICK_MEASUREMENTS.get(stage or "", []))
+
+
 def process_card_text(process: Drink, latest_measurement: Measurement | None = None) -> str:
     stage = process.current_stage or "Не указан"
     created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "—"
@@ -128,9 +159,23 @@ def process_card_text(process: Drink, latest_measurement: Measurement | None = N
         f"Этап: {stage_icon(process.current_stage)} {escape(stage)}\n"
         f"Добавлено: {created_at}"
     )
+
     if latest_measurement is not None:
         text += f"\n\nПоследний замер:\n{measurement_display(latest_measurement)}"
+
+    quick_measurements = quick_measurements_for_stage(process.current_stage)
+    if quick_measurements:
+        labels = " · ".join(label for _measurement_type, label in quick_measurements)
+        text += f"\n\n<b>Сейчас может пригодиться:</b>\n{labels}"
+
     return text
+
+
+def process_card_markup(process: Drink):
+    return process_card_keyboard(
+        process.id,
+        quick_measurements_for_stage(process.current_stage),
+    )
 
 
 def measurement_types_for_stage(stage: str | None) -> list[tuple[str, str]]:
@@ -429,7 +474,7 @@ async def process_stage_handler(
         await state.clear()
         await callback.message.edit_text(
             f"✅ Процесс добавлен\n\n{process_card_text(process)}",
-            reply_markup=process_card_keyboard(process.id),
+            reply_markup=process_card_markup(process),
         )
         return
 
@@ -451,7 +496,7 @@ async def process_stage_handler(
         await state.clear()
         await callback.message.edit_text(
             process_card_text(process, latest_measurement),
-            reply_markup=process_card_keyboard(process.id),
+            reply_markup=process_card_markup(process),
         )
 
 
@@ -504,7 +549,7 @@ async def process_custom_stage_handler(
     await state.clear()
     await message.answer(
         process_card_text(process, latest_measurement),
-        reply_markup=process_card_keyboard(process.id),
+        reply_markup=process_card_markup(process),
     )
 
 
@@ -536,7 +581,7 @@ async def process_view_handler(
 
     await callback.message.edit_text(
         process_card_text(process, latest_measurement),
-        reply_markup=process_card_keyboard(process.id),
+        reply_markup=process_card_markup(process),
     )
 
 
@@ -616,6 +661,7 @@ async def process_measurement_type_handler(
 
     config = MEASUREMENT_TYPES.get(measurement_type)
     if config is None:
+        await state.clear()
         return
 
     await state.update_data(
@@ -713,7 +759,7 @@ async def process_measurement_value_handler(
     await state.clear()
     await message.answer(
         f"✅ Замер сохранён\n\n{process_card_text(process, measurement)}",
-        reply_markup=process_card_keyboard(process.id),
+        reply_markup=process_card_markup(process),
     )
 
 
@@ -743,7 +789,7 @@ async def process_rename_handler(
     await state.update_data(process_id=process_id)
     await state.set_state(ProcessState.waiting_rename)
     await callback.message.edit_text(
-        f"✏️ <b>Переименовать процесс</b>\n\n"
+        "✏️ <b>Переименовать процесс</b>\n\n"
         f"Текущее название: {escape(process.name)}\n\n"
         "Введите новое название.",
         reply_markup=process_input_cancel_keyboard(process_id),
@@ -785,7 +831,7 @@ async def process_rename_value_handler(
     await state.clear()
     await message.answer(
         f"✅ Процесс переименован\n\n{process_card_text(process, latest_measurement)}",
-        reply_markup=process_card_keyboard(process.id),
+        reply_markup=process_card_markup(process),
     )
 
 
