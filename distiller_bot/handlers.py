@@ -72,7 +72,7 @@ async def section_placeholder_handler(callback: CallbackQuery, state: FSMContext
 
     section = (callback.data or "").removeprefix("menu:")
     titles = {
-        "drinks": "🥃 Напитки",
+        "drinks": "🧪 Мои процессы",
         "recipes": "📖 Рецепты",
         "calculators": "🧮 Калькуляторы",
     }
