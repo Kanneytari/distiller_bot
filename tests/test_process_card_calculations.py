@@ -30,7 +30,8 @@ def test_process_card_shows_selected_fermentable_in_composition() -> None:
     text = process_card_text(process)
 
     assert "🍬 <b>Состав браги:</b>" in text
-    assert "Сырьё: Глюкоза · ⚖️ 5.37 кг" in text
+    assert "Глюкоза · ⚖️ 5.37 кг" in text
+    assert "Сырьё:" not in text
     assert "💧 Вода: 21.78 л · 🪣 Объём: 25 л" in text
     assert "📈 Потенциальная крепость: ~12%" in text
     assert "Сохранённый расчёт" not in text
@@ -54,7 +55,8 @@ def test_process_card_accepts_legacy_saved_calculation_as_sucrose_composition() 
     text = process_card_text(process)
 
     assert "🍬 <b>Состав браги:</b>" in text
-    assert "Сырьё: Сахар · ⚖️ 5.1 кг" in text
+    assert "Сахар · ⚖️ 5.1 кг" in text
+    assert "Сырьё:" not in text
 
 
 def test_process_card_ignores_broken_preparation_composition() -> None:
