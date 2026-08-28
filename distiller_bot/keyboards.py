@@ -89,7 +89,7 @@ def process_card_keyboard(
         )
         row_sizes.append(1)
 
-    # Заметка и калькуляторы — компактные вторичные действия в одной строке.
+    # Заметка и калькуляторы - компактные вторичные действия в одной строке.
     secondary_count = 0
     for action_key, label in secondary_actions:
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
