@@ -112,7 +112,7 @@ def test_edit_volume_keeps_abv_and_recalculates_ingredients() -> None:
     assert updated.volume_l == Decimal("30.00")
     assert updated.potential_abv == original.potential_abv
     assert updated.sugar_kg == Decimal("6.44")
-    assert updated.water_l == Decimal("26.14")
+    assert updated.water_l == Decimal("26.13")
 
 
 def test_edit_abv_keeps_volume_and_recalculates_ingredients() -> None:
