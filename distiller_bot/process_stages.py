@@ -21,7 +21,7 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
         actions=(
             StageAction("measure", "📏 Добавить данные"),
             StageAction("note", "📝 Заметка"),
-            StageAction("calculators", "🧮 Калькуляторы"),
+            StageAction("sugar_wash", "🧮 Калькуляторы"),
             StageAction("complete_stage", "✅ Завершить этап"),
         ),
     ),
