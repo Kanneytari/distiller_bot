@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from distiller_bot.models import Drink, Measurement
 from distiller_bot.processes import (
+    format_decimal,
     measurement_types_for_stage,
     parse_measurement_value,
     process_card_text,
@@ -50,6 +51,12 @@ def test_measurement_value_accepts_explicit_unit() -> None:
     parsed = parse_measurement_value("42 %", "%")
 
     assert parsed == (Decimal("42"), "%")
+
+
+def test_whole_number_measurement_keeps_trailing_zeroes() -> None:
+    assert format_decimal(Decimal("40")) == "40"
+    assert format_decimal(Decimal("100")) == "100"
+    assert format_decimal(Decimal("40.5000")) == "40.5"
 
 
 def test_process_card_shows_latest_measurement() -> None:
