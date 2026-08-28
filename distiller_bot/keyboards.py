@@ -47,10 +47,11 @@ def process_stage_keyboard(process_id: int | None = None) -> InlineKeyboardMarku
 
 def process_card_keyboard(process_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Переименовать", callback_data=f"process:rename:{process_id}")
     builder.button(text="🔄 Изменить этап", callback_data=f"process:change-stage:{process_id}")
     builder.button(text="← Мои процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
-    builder.adjust(1)
+    builder.adjust(2, 1, 1)
     return builder.as_markup()
 
 
