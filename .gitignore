@@ -1,5 +1,8 @@
 .env
 .venv/
+distiller_bot.db
+distiller_bot.db-shm
+distiller_bot.db-wal
 __pycache__/
 *.py[cod]
 .pytest_cache/
