@@ -20,11 +20,17 @@ def button_texts(markup) -> list[str]:
     return [button.text for row in markup.inline_keyboard for button in row]
 
 
-def test_calculators_are_grouped_by_preparation_stage() -> None:
+def test_calculators_are_grouped_by_stage() -> None:
     markup = calculators_menu_keyboard()
 
-    assert button_texts(markup)[0] == "🧰 Подготовка браги"
-    assert button_callbacks(markup)[0] == "calculators:preparation"
+    assert button_texts(markup)[:2] == [
+        "🧰 Подготовка браги",
+        "⚗️ Первая перегонка",
+    ]
+    assert button_callbacks(markup)[:2] == [
+        "calculators:preparation",
+        "calculators:first-distillation",
+    ]
 
 
 def test_preparation_category_exposes_fermentable_wash_calculator() -> None:
