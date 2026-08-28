@@ -45,14 +45,32 @@ def process_stage_keyboard(process_id: int | None = None) -> InlineKeyboardMarku
     return builder.as_markup()
 
 
-def process_card_keyboard(process_id: int) -> InlineKeyboardMarkup:
+def process_card_keyboard(
+    process_id: int,
+    quick_measurements: Iterable[tuple[str, str]] = (),
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="➕ Замер", callback_data=f"process:measure:{process_id}")
+    quick_items = list(quick_measurements)
+
+    for measurement_type, label in quick_items:
+        builder.button(
+            text=label,
+            callback_data=f"process:measure-type:{process_id}:{measurement_type}",
+        )
+
+    builder.button(
+        text="➕ Другой замер" if quick_items else "➕ Замер",
+        callback_data=f"process:measure:{process_id}",
+    )
     builder.button(text="✏️ Переименовать", callback_data=f"process:rename:{process_id}")
     builder.button(text="🔄 Изменить этап", callback_data=f"process:change-stage:{process_id}")
     builder.button(text="← Мои процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
-    builder.adjust(1, 2, 1, 1)
+
+    if quick_items:
+        builder.adjust(2, 1, 2, 1, 1)
+    else:
+        builder.adjust(1, 2, 1, 1)
     return builder.as_markup()
 
 
