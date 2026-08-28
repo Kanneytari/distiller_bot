@@ -14,6 +14,7 @@ PROCESS_ACTION_CALLBACKS: dict[str, str] = {
     "calculators": "process:calculators:{process_id}",
     "sugar_wash": "process:sugar-wash:{process_id}",
     "complete_stage": "process:complete-stage:{process_id}",
+    "change_stage": "process:change-stage:{process_id}",
     "complete_process": "process:complete:{process_id}",
 }
 
@@ -67,7 +68,7 @@ def process_card_keyboard(process_id: int, stage_actions: Iterable[tuple[str, st
     for action_key, label in stage_actions:
         if action_key == "note":
             continue
-        if action_key in {"complete_stage", "complete_process"}:
+        if action_key in {"complete_stage", "change_stage", "complete_process"}:
             completion_action = (action_key, label)
         elif action_key in {"calculators", "sugar_wash", "first_distillation_calculators"}:
             secondary_actions.append((action_key, label))
@@ -94,10 +95,15 @@ def process_card_keyboard(process_id: int, stage_actions: Iterable[tuple[str, st
 
     compact_action_count = 1
     if completion_action is not None:
-        action_key, _label = completion_action
+        action_key, label = completion_action
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
         if callback_template is not None:
-            button_text = "➡️ Следующий этап" if action_key == "complete_stage" else "✅ Завершить процесс"
+            if action_key == "complete_stage":
+                button_text = "➡️ Следующий этап"
+            elif action_key == "change_stage":
+                button_text = label
+            else:
+                button_text = "✅ Завершить процесс"
             builder.button(text=button_text, callback_data=callback_template.format(process_id=process_id))
             compact_action_count += 1
 
