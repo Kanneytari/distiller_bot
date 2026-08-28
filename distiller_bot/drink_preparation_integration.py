@@ -3,6 +3,9 @@ from . import processes as processes_module
 from .process_stages import stage_type_for_title
 
 
+processes_module.STAGE_QUICK_MEASUREMENTS["drink_preparation"] = []
+processes_module.STAGE_MEASUREMENT_ORDER["drink_preparation"] = []
+
 _original_get_owned_process = processes_module.get_owned_process
 _original_change_process_stage = processes_module.change_process_stage
 _original_process_card_text = processes_module.process_card_text
