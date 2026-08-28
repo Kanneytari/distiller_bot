@@ -26,6 +26,7 @@ from .process_stages import (
     stage_icon,
     stage_type_for_title,
 )
+from .sugar_wash import result_from_event_data
 
 router = Router()
 
@@ -141,26 +142,16 @@ def note_preview(note: DrinkEvent | None) -> str | None:
 
 
 def preparation_composition_display(composition: DrinkEvent | None) -> str | None:
-    if composition is None or not composition.data:
-        return None
-
-    try:
-        water_l = Decimal(str(composition.data["water_l"]))
-        sugar_kg = Decimal(str(composition.data["sugar_kg"]))
-        volume_l = Decimal(str(composition.data["volume_l"]))
-        potential_abv = Decimal(str(composition.data["potential_abv"]))
-    except (KeyError, InvalidOperation, TypeError):
-        return None
-
-    values = (water_l, sugar_kg, volume_l, potential_abv)
-    if not all(value.is_finite() for value in values):
+    result = result_from_event_data(composition.data if composition is not None else None)
+    if result is None:
         return None
 
     return (
-        f"💧 Вода: {format_decimal(water_l)} л · "
-        f"🍬 Сахар: {format_decimal(sugar_kg)} кг\n"
-        f"🪣 Объём: {format_decimal(volume_l)} л · "
-        f"📈 Потенциальная крепость: ~{format_decimal(potential_abv)}%"
+        f"Сырьё: {result.fermentable_label} · "
+        f"⚖️ {format_decimal(result.sugar_kg)} кг\n"
+        f"💧 Вода: {format_decimal(result.water_l)} л · "
+        f"🪣 Объём: {format_decimal(result.volume_l)} л\n"
+        f"📈 Потенциальная крепость: ~{format_decimal(result.potential_abv)}%"
     )
 
 
