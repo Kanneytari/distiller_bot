@@ -97,8 +97,9 @@ def test_first_distillation_has_containers_and_dedicated_calculators() -> None:
     assert ("➡️ Следующий этап", "process:complete-stage:42") in buttons
 
 
-def test_bottling_finishes_process_instead_of_showing_next_stage() -> None:
+def test_bottling_can_return_to_any_stage_instead_of_finishing_process() -> None:
     buttons = button_pairs("Розлив")
 
-    assert ("✅ Завершить процесс", "process:complete:42") in buttons
-    assert all(text != "➡️ Следующий этап" for text, _callback in buttons)
+    assert ("🔄 Выбрать этап", "process:change-stage:42") in buttons
+    assert all(text != "✅ Завершить процесс" for text, _callback in buttons)
+    assert all(callback != "process:complete:42" for _text, callback in buttons)
