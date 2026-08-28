@@ -39,9 +39,9 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
         title="Первая перегонка",
         icon="⚗️",
         actions=(
-            StageAction("first_distillation_result", "✏️ Результат"),
+            StageAction("first_distillation", "🫙 Ёмкости"),
             StageAction("note", "📝 Заметка"),
-            StageAction("calculators", "🧮 Калькуляторы"),
+            StageAction("first_distillation_calculators", "🧮 Калькуляторы"),
             StageAction("complete_stage", "✅ Завершить первую перегонку"),
         ),
     ),
@@ -55,8 +55,7 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
             StageAction("complete_stage", "✅ Завершить вторую перегонку"),
         ),
     ),
-    # Legacy-тип нужен только для уже сохранённых процессов.
-    # Новые клавиатуры больше не позволяют выбрать общую "Перегонку".
+    # Legacy type for already stored processes only.
     "distillation": StageDefinition(
         title="Перегонка",
         icon="⚗️",
@@ -88,8 +87,6 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
     ),
 }
 
-# Старые callback-ключи оставлены только для совместимости со старыми данными.
-# Новые клавиатуры используют только актуальные ключи этапов.
 STAGE_TITLES: dict[str, str] = {
     "preparation": "Подготовка",
     "fermentation": "Брожение",
@@ -126,20 +123,16 @@ def stage_type_for_title(stage: str | None) -> str | None:
     """Resolve a stored stage title to its reusable stage type."""
     if not stage:
         return None
-
     legacy_type = LEGACY_STAGE_TYPES.get(stage)
     if legacy_type is not None:
         return legacy_type
-
     for stage_type, definition in STAGE_DEFINITIONS.items():
         if stage == definition.title:
             return stage_type
-
         prefix = f"{definition.title} #"
         suffix = stage.removeprefix(prefix)
         if stage.startswith(prefix) and suffix.isdigit():
             return stage_type
-
     return None
 
 
