@@ -8,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from .equipment import router as equipment_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
 from .models import User
+from .preparation_calculators import router as preparation_calculators_router
 from .processes import router as processes_router
 
 router = Router()
+router.include_router(preparation_calculators_router)
 router.include_router(processes_router)
 router.include_router(equipment_router)
 
