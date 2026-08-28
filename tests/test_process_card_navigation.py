@@ -1,4 +1,4 @@
-from distiller_bot.keyboards import process_card_keyboard
+from distiller_bot.keyboards import process_card_keyboard, process_stage_keyboard
 from distiller_bot.models import Drink, DrinkEvent
 from distiller_bot.process_stages import stage_actions_for_stage
 from distiller_bot.processes import process_card_text
@@ -48,6 +48,32 @@ def test_regular_stage_uses_next_stage_and_has_no_manual_stage_button() -> None:
     assert ("➡️ Следующий этап", "process:complete-stage:42") in buttons
     assert all(text != "🔄 Этап" for text, _callback in buttons)
     assert all(callback != "process:change-stage:42" for _text, callback in buttons)
+
+
+def test_process_card_uses_process_emoji_instead_of_back_arrow() -> None:
+    buttons = button_pairs("Подготовка")
+
+    assert ("🧪 Процессы", "menu:drinks") in buttons
+    assert all(text != "← Процессы" for text, _callback in buttons)
+
+
+def test_stage_selector_only_offers_predefined_stages() -> None:
+    markup = process_stage_keyboard(42)
+    buttons = [
+        (button.text, button.callback_data)
+        for row in markup.inline_keyboard
+        for button in row
+    ]
+
+    assert buttons == [
+        ("🧰 Подготовка", "process:stage:preparation"),
+        ("🫧 Брожение", "process:stage:fermentation"),
+        ("⚗️ Перегонка", "process:stage:distillation"),
+        ("💧 Подготовка напитка", "process:stage:drink_preparation"),
+        ("🍾 Розлив", "process:stage:bottling"),
+        ("❌ Отмена", "process:view:42"),
+    ]
+    assert all(callback != "process:stage:custom" for _text, callback in buttons)
 
 
 def test_bottling_finishes_process_instead_of_showing_next_stage() -> None:
