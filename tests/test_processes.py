@@ -7,6 +7,7 @@ from distiller_bot.processes import (
     parse_measurement_value,
     process_card_text,
     process_short_label,
+    quick_measurements_for_stage,
 )
 
 
@@ -39,6 +40,34 @@ def test_fermentation_prioritizes_density_and_temperature() -> None:
         "density",
         "temperature",
     ]
+
+
+def test_quick_measurements_change_with_stage() -> None:
+    assert quick_measurements_for_stage("Подготовка") == [
+        ("volume", "💧 Объём"),
+        ("density", "📏 Начальная плотность"),
+    ]
+    assert quick_measurements_for_stage("Брожение") == [
+        ("density", "📏 Плотность"),
+        ("temperature", "🌡 Температура"),
+    ]
+    assert quick_measurements_for_stage("Готово") == [
+        ("abv", "🥃 Итоговая крепость"),
+        ("volume", "💧 Итоговый объём"),
+    ]
+
+
+def test_custom_stage_has_no_forced_quick_measurements() -> None:
+    assert quick_measurements_for_stage("Мой этап") == []
+
+
+def test_process_card_shows_contextual_suggestions() -> None:
+    process = make_process(name="Сахарная брага", stage="Брожение")
+
+    text = process_card_text(process)
+
+    assert "Сейчас может пригодиться:" in text
+    assert "📏 Плотность · 🌡 Температура" in text
 
 
 def test_measurement_value_accepts_comma_and_default_unit() -> None:
