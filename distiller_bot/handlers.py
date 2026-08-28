@@ -7,12 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .calculator_keyboards import calculators_menu_keyboard, preparation_calculators_keyboard
 from .equipment import router as equipment_router
+from .global_calculators import router as global_calculators_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
 from .models import User
 from .preparation_calculators import router as preparation_calculators_router
 from .processes import router as processes_router
 
 router = Router()
+router.include_router(global_calculators_router)
 router.include_router(preparation_calculators_router)
 router.include_router(processes_router)
 router.include_router(equipment_router)
