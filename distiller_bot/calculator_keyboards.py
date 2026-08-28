@@ -6,6 +6,7 @@ def calculators_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🧰 Подготовка браги", callback_data="calculators:preparation")
     builder.button(text="⚗️ Первая перегонка", callback_data="calculators:first-distillation")
+    builder.button(text="⚗️ Вторая перегонка", callback_data="calculators:second-distillation")
     builder.button(text="🏠 Меню", callback_data="menu:main")
     builder.adjust(1)
     return builder.as_markup()
@@ -33,8 +34,14 @@ def global_sugar_wash_menu_keyboard() -> InlineKeyboardMarkup:
 
 
 def global_sugar_wash_input_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder(); builder.button(text="❌ Отмена", callback_data="calculators:sugar-wash"); return builder.as_markup()
+    builder = InlineKeyboardBuilder()
+    builder.button(text="❌ Отмена", callback_data="calculators:sugar-wash")
+    return builder.as_markup()
 
 
 def global_sugar_wash_result_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder(); builder.button(text="↩️ Новый расчёт", callback_data="calculators:sugar-wash"); builder.button(text="← Подготовка браги", callback_data="calculators:preparation"); builder.adjust(1); return builder.as_markup()
+    builder = InlineKeyboardBuilder()
+    builder.button(text="↩️ Новый расчёт", callback_data="calculators:sugar-wash")
+    builder.button(text="← Подготовка браги", callback_data="calculators:preparation")
+    builder.adjust(1)
+    return builder.as_markup()
