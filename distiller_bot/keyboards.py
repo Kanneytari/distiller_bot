@@ -103,20 +103,24 @@ def process_card_keyboard(
     if secondary_count:
         row_sizes.append(secondary_count)
 
-    compact_action_count = 2
+    # Переход к следующему этапу и переименование держим в одной компактной строке.
+    compact_action_count = 1
     if completion_action is not None:
         action_key, _label = completion_action
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
         if callback_template is not None:
+            button_text = (
+                "➡️ Следующий этап"
+                if action_key == "complete_stage"
+                else "✅ Завершить процесс"
+            )
             builder.button(
-                text="✅ Завершить",
+                text=button_text,
                 callback_data=callback_template.format(process_id=process_id),
             )
             compact_action_count += 1
 
-    # Служебные действия процесса держим в одной компактной строке.
     builder.button(text="✏️ Имя", callback_data=f"process:rename:{process_id}")
-    builder.button(text="🔄 Этап", callback_data=f"process:change-stage:{process_id}")
     row_sizes.append(compact_action_count)
 
     # Навигация тоже не должна растягивать карточку по вертикали.
