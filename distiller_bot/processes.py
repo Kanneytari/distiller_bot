@@ -149,6 +149,30 @@ def note_preview(note: DrinkEvent | None) -> str | None:
     return escape(text)
 
 
+def sugar_wash_calculation_display(calculation: DrinkEvent | None) -> str | None:
+    if calculation is None or not calculation.data:
+        return None
+
+    try:
+        water_l = Decimal(str(calculation.data["water_l"]))
+        sugar_kg = Decimal(str(calculation.data["sugar_kg"]))
+        volume_l = Decimal(str(calculation.data["volume_l"]))
+        potential_abv = Decimal(str(calculation.data["potential_abv"]))
+    except (KeyError, InvalidOperation, TypeError):
+        return None
+
+    values = (water_l, sugar_kg, volume_l, potential_abv)
+    if not all(value.is_finite() for value in values):
+        return None
+
+    return (
+        f"💧 Вода: {format_decimal(water_l)} л · "
+        f"🍬 Сахар: {format_decimal(sugar_kg)} кг\n"
+        f"🪣 Объём: {format_decimal(volume_l)} л · "
+        f"📈 Потенциальная крепость: ~{format_decimal(potential_abv)}%"
+    )
+
+
 def measurement_stage_type(stage: str | None) -> str | None:
     stage_type = stage_type_for_title(stage)
     if stage_type is not None:
@@ -175,6 +199,11 @@ def process_card_text(
         f"Этап: {stage_icon(process.current_stage)} {escape(stage)}\n"
         f"Добавлено: {created_at}"
     )
+
+    latest_calculation = getattr(process, "_latest_sugar_wash_calculation", None)
+    calculation_text = sugar_wash_calculation_display(latest_calculation)
+    if calculation_text is not None:
+        text += f"\n\n🧮 <b>Сохранённый расчёт:</b>\n{calculation_text}"
 
     if latest_measurement is not None:
         text += f"\n\nПоследний замер:\n{measurement_display(latest_measurement)}"
@@ -258,7 +287,25 @@ async def get_owned_process(
         .join(User, Drink.user_id == User.id)
         .where(Drink.id == process_id, User.telegram_id == telegram_id)
     )
-    return result.scalar_one_or_none()
+    process = result.scalar_one_or_none()
+    if process is None:
+        return None
+
+    calculation_result = await session.execute(
+        select(DrinkEvent)
+        .where(
+            DrinkEvent.drink_id == process.id,
+            DrinkEvent.event_type == "sugar_wash_calculation",
+        )
+        .order_by(DrinkEvent.created_at.desc(), DrinkEvent.id.desc())
+        .limit(1)
+    )
+    setattr(
+        process,
+        "_latest_sugar_wash_calculation",
+        calculation_result.scalar_one_or_none(),
+    )
+    return process
 
 
 async def get_latest_measurement(session: AsyncSession, process_id: int) -> Measurement | None:
