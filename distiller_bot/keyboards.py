@@ -47,11 +47,31 @@ def process_stage_keyboard(process_id: int | None = None) -> InlineKeyboardMarku
 
 def process_card_keyboard(process_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Замер", callback_data=f"process:measure:{process_id}")
     builder.button(text="✏️ Переименовать", callback_data=f"process:rename:{process_id}")
     builder.button(text="🔄 Изменить этап", callback_data=f"process:change-stage:{process_id}")
     builder.button(text="← Мои процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
-    builder.adjust(2, 1, 1)
+    builder.adjust(1, 2, 1, 1)
+    return builder.as_markup()
+
+
+def process_measurement_type_keyboard(
+    process_id: int,
+    ordered_types: Iterable[tuple[str, str]],
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for measurement_type, label in ordered_types:
+        builder.button(
+            text=label,
+            callback_data=f"process:measure-type:{process_id}:{measurement_type}",
+        )
+    builder.button(
+        text="✏️ Другой замер",
+        callback_data=f"process:measure-type:{process_id}:custom",
+    )
+    builder.button(text="❌ Отмена", callback_data=f"process:view:{process_id}")
+    builder.adjust(2, 2, 1, 1)
     return builder.as_markup()
 
 
