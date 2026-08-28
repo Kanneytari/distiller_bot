@@ -96,9 +96,9 @@ async def global_sugar_wash_menu_handler(callback: CallbackQuery, state: FSMCont
         await callback.message.edit_text(
             "🧮 <b>Расчёт браги</b>\n\n"
             "Выберите, от каких данных хотите считать:\n\n"
-            "🪣 <b>По объёму</b> — знаю желаемый объём браги.\n"
-            "⚖️ <b>По количеству сырья</b> — знаю, сколько сырья есть.\n"
-            "📈 <b>Проверить состав</b> — уже знаю сырьё и воду.",
+            "🪣 <b>По объёму</b> - знаю желаемый объём браги.\n"
+            "⚖️ <b>По количеству сырья</b> - знаю, сколько сырья есть.\n"
+            "📈 <b>Проверить состав</b> - уже знаю сырьё и воду.",
             reply_markup=global_sugar_wash_menu_keyboard(),
         )
         return
