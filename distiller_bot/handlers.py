@@ -20,6 +20,7 @@ from .second_distillation import router as second_distillation_router
 from . import fermentation_integration  # noqa: F401
 from . import second_distillation_integration  # noqa: F401
 from . import drink_preparation_integration  # noqa: F401
+from .drink_parameters import router as drink_parameters_router
 from .stage_selection_guard import router as stage_selection_guard_router
 
 router = Router()
@@ -30,6 +31,7 @@ router.include_router(fermentation_router)
 router.include_router(first_distillation_router)
 router.include_router(second_distillation_router)
 router.include_router(drink_preparation_router)
+router.include_router(drink_parameters_router)
 router.include_router(stage_selection_guard_router)
 router.include_router(processes_router)
 router.include_router(equipment_router)
