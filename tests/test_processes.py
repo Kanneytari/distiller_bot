@@ -92,12 +92,12 @@ def test_drink_preparation_action_order_matches_ui_spec() -> None:
     ]
 
 
-def test_bottling_has_no_calculators_and_can_finish_process() -> None:
+def test_bottling_can_return_to_previous_stage() -> None:
     assert stage_icon("Розлив") == "🍾"
     assert action_labels("Розлив") == [
         "📏 Записать результат",
         "📝 Заметка",
-        "✅ Завершить процесс",
+        "🔄 Выбрать этап",
     ]
 
 
