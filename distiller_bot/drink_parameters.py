@@ -4,12 +4,12 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from . import processes as processes_module
-from .keyboards import process_card_markup if False else process_stage_keyboard
-from .keyboards import process_list_keyboard
+from .keyboards import process_list_keyboard, process_stage_keyboard
 from .models import Drink
 from .process_stages import STAGE_TITLES, stage_icon
 
@@ -24,8 +24,6 @@ class DrinkUiState(StatesGroup):
 
 
 def parameters_keyboard(process_id: int):
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-
     builder = InlineKeyboardBuilder()
     builder.button(text="✏️ Название", callback_data=f"process:parameters:rename:{process_id}")
     builder.button(text="📝 Заметка", callback_data=f"process:parameters:note:{process_id}")
@@ -36,8 +34,6 @@ def parameters_keyboard(process_id: int):
 
 
 def delete_confirmation_keyboard(process_id: int):
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-
     builder = InlineKeyboardBuilder()
     builder.button(
         text="🗑 Да, удалить",
@@ -378,9 +374,10 @@ async def delete_confirm_handler(
     async with session_factory() as session:
         process = await processes_module.get_owned_process(session, process_id, callback.from_user.id)
         if process is None:
-            await processes_module.render_process_list(callback, session_factory)
-            return
-        await session.delete(process)
-        await session.commit()
+            missing = True
+        else:
+            missing = False
+            await session.delete(process)
+            await session.commit()
 
     await processes_module.render_process_list(callback, session_factory)
