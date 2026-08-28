@@ -19,6 +19,7 @@ from .processes import router as processes_router
 from .second_distillation import router as second_distillation_router
 from . import fermentation_integration  # noqa: F401
 from . import second_distillation_integration  # noqa: F401
+from . import drink_preparation_integration  # noqa: F401
 from .stage_selection_guard import router as stage_selection_guard_router
 
 router = Router()
