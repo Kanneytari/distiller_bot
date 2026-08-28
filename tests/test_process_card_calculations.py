@@ -11,9 +11,32 @@ def make_process() -> Drink:
     )
 
 
-def test_process_card_shows_latest_saved_sugar_wash_calculation() -> None:
+def test_process_card_shows_latest_preparation_composition() -> None:
     process = make_process()
-    calculation = DrinkEvent(
+    composition = DrinkEvent(
+        drink_id=1,
+        event_type="preparation_composition",
+        title="Состав сахарной браги",
+        data={
+            "water_l": "21.94",
+            "sugar_kg": "5.10",
+            "volume_l": "25.00",
+            "potential_abv": "12.0",
+        },
+    )
+    setattr(process, "_latest_preparation_composition", composition)
+
+    text = process_card_text(process)
+
+    assert "🍬 <b>Состав браги:</b>" in text
+    assert "💧 Вода: 21.94 л · 🍬 Сахар: 5.1 кг" in text
+    assert "🪣 Объём: 25 л · 📈 Потенциальная крепость: ~12%" in text
+    assert "Сохранённый расчёт" not in text
+
+
+def test_process_card_accepts_legacy_saved_calculation_as_composition() -> None:
+    process = make_process()
+    legacy_calculation = DrinkEvent(
         drink_id=1,
         event_type="sugar_wash_calculation",
         title="Расчёт сахарной браги",
@@ -24,25 +47,23 @@ def test_process_card_shows_latest_saved_sugar_wash_calculation() -> None:
             "potential_abv": "12.0",
         },
     )
-    setattr(process, "_latest_sugar_wash_calculation", calculation)
+    setattr(process, "_latest_preparation_composition", legacy_calculation)
 
     text = process_card_text(process)
 
-    assert "🧮 <b>Сохранённый расчёт:</b>" in text
-    assert "💧 Вода: 21.94 л · 🍬 Сахар: 5.1 кг" in text
-    assert "🪣 Объём: 25 л · 📈 Потенциальная крепость: ~12%" in text
+    assert "🍬 <b>Состав браги:</b>" in text
 
 
-def test_process_card_ignores_broken_saved_calculation() -> None:
+def test_process_card_ignores_broken_preparation_composition() -> None:
     process = make_process()
-    calculation = DrinkEvent(
+    composition = DrinkEvent(
         drink_id=1,
-        event_type="sugar_wash_calculation",
-        title="Расчёт сахарной браги",
+        event_type="preparation_composition",
+        title="Состав сахарной браги",
         data={"water_l": "not-a-number"},
     )
-    setattr(process, "_latest_sugar_wash_calculation", calculation)
+    setattr(process, "_latest_preparation_composition", composition)
 
     text = process_card_text(process)
 
-    assert "Сохранённый расчёт" not in text
+    assert "Состав браги" not in text
