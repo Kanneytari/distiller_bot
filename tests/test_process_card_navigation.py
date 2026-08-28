@@ -50,12 +50,19 @@ def test_regular_stage_uses_next_stage_and_has_no_manual_stage_button() -> None:
     assert all(callback != "process:change-stage:42" for _text, callback in buttons)
 
 
-def test_process_card_uses_back_emoji_for_processes() -> None:
+def test_process_card_returns_to_drinks() -> None:
     buttons = button_pairs("Подготовка")
 
-    assert ("🔙 Процессы", "menu:drinks") in buttons
-    assert all(text != "← Процессы" for text, _callback in buttons)
-    assert all(text != "🧪 Процессы" for text, _callback in buttons)
+    assert ("🔙 Напитки", "menu:drinks") in buttons
+    assert all("Процессы" not in text for text, _callback in buttons)
+
+
+def test_process_card_collapses_name_and_note_into_parameters() -> None:
+    buttons = button_pairs("Подготовка")
+
+    assert ("⚙️ Параметры", "process:parameters:42") in buttons
+    assert all(text != "✏️ Имя" for text, _callback in buttons)
+    assert all(text != "📝 Заметка" for text, _callback in buttons)
 
 
 def test_stage_selector_only_offers_predefined_stages() -> None:
