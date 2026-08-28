@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .calculator_keyboards import calculators_menu_keyboard, preparation_calculators_keyboard
 from .equipment import router as equipment_router
+from .fermentation import router as fermentation_router
 from .first_distillation import router as first_distillation_router
 from .global_calculators import router as global_calculators_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
@@ -15,6 +16,7 @@ from .preparation_calculators import router as preparation_calculators_router
 from .preparation_composition import router as preparation_composition_router
 from .processes import router as processes_router
 from .second_distillation import router as second_distillation_router
+from . import fermentation_integration  # noqa: F401
 from . import second_distillation_integration  # noqa: F401
 from .stage_selection_guard import router as stage_selection_guard_router
 
@@ -22,6 +24,7 @@ router = Router()
 router.include_router(global_calculators_router)
 router.include_router(preparation_calculators_router)
 router.include_router(preparation_composition_router)
+router.include_router(fermentation_router)
 router.include_router(first_distillation_router)
 router.include_router(second_distillation_router)
 router.include_router(stage_selection_guard_router)
