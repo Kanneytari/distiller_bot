@@ -29,9 +29,9 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
         title="Брожение",
         icon="🫧",
         actions=(
-            StageAction("measure", "📏 Добавить измерение"),
+            StageAction("fermentation_temperature", "🌡 Температура"),
+            StageAction("fermentation_brix", "🧪 Крепость по Brix"),
             StageAction("note", "📝 Заметка"),
-            StageAction("calculators", "🧮 Калькуляторы"),
             StageAction("complete_stage", "✅ Завершить брожение"),
         ),
     ),
