@@ -21,7 +21,15 @@ def first_distillation_keyboard(
         )
         container_count += 1
     builder.button(text="🔙 К процессу", callback_data=f"process:view:{process_id}")
-    builder.adjust(1, *([3] * ((container_count + 2) // 3)), 1)
+
+    row_sizes = [1]
+    remaining = container_count
+    while remaining > 0:
+        row_size = min(3, remaining)
+        row_sizes.append(row_size)
+        remaining -= row_size
+    row_sizes.append(1)
+    builder.adjust(*row_sizes)
     return builder.as_markup()
 
 
