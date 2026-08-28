@@ -66,10 +66,7 @@ STAGE_MEASUREMENT_ORDER: dict[str, list[str]] = {
 }
 
 STAGE_QUICK_MEASUREMENTS: dict[str, list[tuple[str, str]]] = {
-    "preparation": [
-        ("volume", "💧 Объём"),
-        ("temperature", "🌡 Температура"),
-    ],
+    "preparation": [],
     "fermentation": [
         ("temperature", "🌡 Температура"),
         ("volume", "💧 Объём"),
@@ -143,15 +140,15 @@ def note_preview(note: DrinkEvent | None) -> str | None:
     return escape(text)
 
 
-def sugar_wash_calculation_display(calculation: DrinkEvent | None) -> str | None:
-    if calculation is None or not calculation.data:
+def preparation_composition_display(composition: DrinkEvent | None) -> str | None:
+    if composition is None or not composition.data:
         return None
 
     try:
-        water_l = Decimal(str(calculation.data["water_l"]))
-        sugar_kg = Decimal(str(calculation.data["sugar_kg"]))
-        volume_l = Decimal(str(calculation.data["volume_l"]))
-        potential_abv = Decimal(str(calculation.data["potential_abv"]))
+        water_l = Decimal(str(composition.data["water_l"]))
+        sugar_kg = Decimal(str(composition.data["sugar_kg"]))
+        volume_l = Decimal(str(composition.data["volume_l"]))
+        potential_abv = Decimal(str(composition.data["potential_abv"]))
     except (KeyError, InvalidOperation, TypeError):
         return None
 
@@ -194,10 +191,10 @@ def process_card_text(
         f"Добавлено: {created_at}"
     )
 
-    latest_calculation = getattr(process, "_latest_sugar_wash_calculation", None)
-    calculation_text = sugar_wash_calculation_display(latest_calculation)
-    if calculation_text is not None:
-        text += f"\n\n🧮 <b>Сохранённый расчёт:</b>\n{calculation_text}"
+    latest_composition = getattr(process, "_latest_preparation_composition", None)
+    composition_text = preparation_composition_display(latest_composition)
+    if composition_text is not None:
+        text += f"\n\n🍬 <b>Состав браги:</b>\n{composition_text}"
 
     if latest_measurement is not None:
         text += f"\n\nПоследний замер:\n{measurement_display(latest_measurement)}"
@@ -285,19 +282,19 @@ async def get_owned_process(
     if process is None:
         return None
 
-    calculation_result = await session.execute(
+    composition_result = await session.execute(
         select(DrinkEvent)
         .where(
             DrinkEvent.drink_id == process.id,
-            DrinkEvent.event_type == "sugar_wash_calculation",
+            DrinkEvent.event_type.in_(("preparation_composition", "sugar_wash_calculation")),
         )
         .order_by(DrinkEvent.created_at.desc(), DrinkEvent.id.desc())
         .limit(1)
     )
     setattr(
         process,
-        "_latest_sugar_wash_calculation",
-        calculation_result.scalar_one_or_none(),
+        "_latest_preparation_composition",
+        composition_result.scalar_one_or_none(),
     )
     return process
 
