@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import distiller_bot.fermentation_integration  # noqa: F401
 from distiller_bot.keyboards import process_calculators_keyboard, process_card_keyboard
 from distiller_bot.models import Drink, DrinkEvent, Measurement
 from distiller_bot.process_stages import stage_actions_for_stage, stage_icon, stage_type_for_title
@@ -58,9 +59,9 @@ def test_preparation_process_has_contextual_actions() -> None:
 def test_fermentation_actions_replace_preparation_actions() -> None:
     assert stage_icon("Брожение") == "🫧"
     assert action_labels("Брожение") == [
-        "📏 Добавить измерение",
+        "🌡 Температура",
+        "🧪 Крепость по Brix",
         "📝 Заметка",
-        "🧮 Калькуляторы",
         "✅ Завершить брожение",
     ]
 
@@ -109,14 +110,16 @@ def test_preparation_composition_routes_to_current_process() -> None:
     assert composition.callback_data == "process:composition:42"
 
 
-def test_process_keyboard_routes_calculators_to_current_process() -> None:
+def test_fermentation_keyboard_routes_dedicated_actions() -> None:
     actions = [(action.key, action.label) for action in stage_actions_for_stage("Брожение")]
 
     markup = process_card_keyboard(42, actions)
     buttons = [button for row in markup.inline_keyboard for button in row]
 
-    calculators = next(button for button in buttons if button.text == "🧮 Калькуляторы")
-    assert calculators.callback_data == "process:calculators:42"
+    temperature = next(button for button in buttons if button.text == "🌡 Температура")
+    brix = next(button for button in buttons if button.text == "🧪 Крепость по Brix")
+    assert temperature.callback_data == "process:fermentation-temperature:42"
+    assert brix.callback_data == "process:fermentation-brix:42"
 
 
 def test_calculators_placeholder_has_back_to_process() -> None:
@@ -131,14 +134,10 @@ def test_calculators_placeholder_has_back_to_process() -> None:
     assert button.callback_data == "process:view:42"
 
 
-def test_fermentation_measurements_do_not_offer_density() -> None:
+def test_fermentation_measurements_only_offer_temperature() -> None:
     types = measurement_types_for_stage("Брожение")
 
-    assert [measurement_type for measurement_type, _label in types] == [
-        "temperature",
-        "volume",
-        "abv",
-    ]
+    assert [measurement_type for measurement_type, _label in types] == ["temperature"]
 
 
 def test_no_stage_offers_density_measurement() -> None:
@@ -157,10 +156,7 @@ def test_repeated_distillation_keeps_distillation_measurement_order() -> None:
 
 def test_quick_measurements_change_with_stage() -> None:
     assert quick_measurements_for_stage("Подготовка") == []
-    assert quick_measurements_for_stage("Брожение") == [
-        ("temperature", "🌡 Температура"),
-        ("volume", "💧 Объём"),
-    ]
+    assert quick_measurements_for_stage("Брожение") == []
     assert quick_measurements_for_stage("Готово") == [
         ("abv", "🥃 Итоговая крепость"),
         ("volume", "💧 Итоговый объём"),
@@ -179,13 +175,12 @@ def test_preparation_card_has_no_measurement_hint() -> None:
     assert "Сейчас может пригодиться:" not in text
 
 
-def test_process_card_shows_contextual_suggestions() -> None:
+def test_fermentation_card_has_no_redundant_measurement_hint() -> None:
     process = make_process(name="Сахарная брага", stage="Брожение")
 
     text = process_card_text(process)
 
-    assert "Сейчас может пригодиться:" in text
-    assert "🌡 Температура · 💧 Объём" in text
+    assert "Сейчас может пригодиться:" not in text
 
 
 def test_measurement_value_accepts_comma_and_default_unit() -> None:
