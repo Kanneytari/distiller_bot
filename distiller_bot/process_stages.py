@@ -49,9 +49,9 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
         title="Вторая перегонка",
         icon="⚗️",
         actions=(
-            StageAction("measure", "📏 Записать результат"),
+            StageAction("second_distillation", "🫙 Отборы"),
             StageAction("note", "📝 Заметка"),
-            StageAction("calculators", "🧮 Калькуляторы"),
+            StageAction("second_distillation_calculators", "🧮 Калькуляторы"),
             StageAction("complete_stage", "✅ Завершить вторую перегонку"),
         ),
     ),
