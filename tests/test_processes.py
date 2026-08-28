@@ -48,7 +48,7 @@ def test_preparation_process_has_contextual_actions() -> None:
 
     assert "Этап: 🧰 Подготовка" in text
     assert action_labels("Подготовка") == [
-        "📏 Добавить данные",
+        "✏️ Состав",
         "📝 Заметка",
         "🧮 Калькуляторы",
         "✅ Завершить этап",
@@ -99,6 +99,16 @@ def test_bottling_has_no_calculators_and_can_finish_process() -> None:
     ]
 
 
+def test_preparation_composition_routes_to_current_process() -> None:
+    actions = [(action.key, action.label) for action in stage_actions_for_stage("Подготовка")]
+
+    markup = process_card_keyboard(42, actions)
+    buttons = [button for row in markup.inline_keyboard for button in row]
+
+    composition = next(button for button in buttons if button.text == "✏️ Состав")
+    assert composition.callback_data == "process:composition:42"
+
+
 def test_process_keyboard_routes_calculators_to_current_process() -> None:
     actions = [(action.key, action.label) for action in stage_actions_for_stage("Брожение")]
 
@@ -146,10 +156,7 @@ def test_repeated_distillation_keeps_distillation_measurement_order() -> None:
 
 
 def test_quick_measurements_change_with_stage() -> None:
-    assert quick_measurements_for_stage("Подготовка") == [
-        ("volume", "💧 Объём"),
-        ("temperature", "🌡 Температура"),
-    ]
+    assert quick_measurements_for_stage("Подготовка") == []
     assert quick_measurements_for_stage("Брожение") == [
         ("temperature", "🌡 Температура"),
         ("volume", "💧 Объём"),
@@ -162,6 +169,14 @@ def test_quick_measurements_change_with_stage() -> None:
 
 def test_custom_stage_has_no_forced_quick_measurements() -> None:
     assert quick_measurements_for_stage("Мой этап") == []
+
+
+def test_preparation_card_has_no_measurement_hint() -> None:
+    process = make_process(name="Сахарная брага", stage="Подготовка")
+
+    text = process_card_text(process)
+
+    assert "Сейчас может пригодиться:" not in text
 
 
 def test_process_card_shows_contextual_suggestions() -> None:
