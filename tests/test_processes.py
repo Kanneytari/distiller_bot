@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 import distiller_bot.fermentation_integration  # noqa: F401
+import distiller_bot.second_distillation_integration  # noqa: F401
+import distiller_bot.drink_preparation_integration  # noqa: F401
 from distiller_bot.keyboards import process_calculators_keyboard, process_card_keyboard
 from distiller_bot.models import Drink, DrinkEvent, Measurement
 from distiller_bot.process_stages import stage_actions_for_stage, stage_icon, stage_type_for_title
@@ -84,8 +86,7 @@ def test_repeated_distillation_uses_same_stage_type_without_unique_stage_assumpt
 
 def test_drink_preparation_action_order_matches_ui_spec() -> None:
     assert action_labels("Подготовка напитка") == [
-        "📏 Параметры напитка",
-        "🧮 Калькуляторы",
+        "💧 Разбавление",
         "📝 Заметка",
         "✅ Завершить этап",
     ]
@@ -120,6 +121,19 @@ def test_fermentation_keyboard_routes_dedicated_actions() -> None:
     brix = next(button for button in buttons if button.text == "🧪 Крепость по Brix")
     assert temperature.callback_data == "process:fermentation-temperature:42"
     assert brix.callback_data == "process:fermentation-brix:42"
+
+
+def test_drink_preparation_keyboard_routes_dilution() -> None:
+    actions = [
+        (action.key, action.label)
+        for action in stage_actions_for_stage("Подготовка напитка")
+    ]
+
+    markup = process_card_keyboard(42, actions)
+    buttons = [button for row in markup.inline_keyboard for button in row]
+
+    dilution = next(button for button in buttons if button.text == "💧 Разбавление")
+    assert dilution.callback_data == "process:drink-preparation:42"
 
 
 def test_calculators_placeholder_has_back_to_process() -> None:
@@ -157,6 +171,7 @@ def test_repeated_distillation_keeps_distillation_measurement_order() -> None:
 def test_quick_measurements_change_with_stage() -> None:
     assert quick_measurements_for_stage("Подготовка") == []
     assert quick_measurements_for_stage("Брожение") == []
+    assert quick_measurements_for_stage("Подготовка напитка") == []
     assert quick_measurements_for_stage("Готово") == [
         ("abv", "🥃 Итоговая крепость"),
         ("volume", "💧 Итоговый объём"),
