@@ -60,7 +60,7 @@ def process_card_text(process: Drink) -> str:
     created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "—"
     return (
         f"🧪 <b>{escape(process.name)}</b>\n\n"
-        f"Этап: {escape(stage)}\n"
+        f"Этап: {stage_icon(process.current_stage)} {escape(stage)}\n"
         f"Добавлено: {created_at}"
     )
 
