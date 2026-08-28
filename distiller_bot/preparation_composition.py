@@ -50,7 +50,7 @@ async def save_preparation_composition(
     data.update({"stage": "Подготовка", "source": source})
     event = DrinkEvent(
         drink_id=process_id,
-        event_type="sugar_wash_calculation",
+        event_type="preparation_composition",
         title="Состав сахарной браги",
         data=data,
     )
@@ -181,7 +181,7 @@ async def preparation_composition_water_handler(
             result=result,
             source="manual",
         )
-        setattr(process, "_latest_sugar_wash_calculation", event)
+        setattr(process, "_latest_preparation_composition", event)
         latest_measurement, latest_note = await get_process_card_context(session, process.id)
 
     await state.clear()
