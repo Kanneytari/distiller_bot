@@ -147,7 +147,7 @@ def preparation_composition_display(composition: DrinkEvent | None) -> str | Non
         return None
 
     return (
-        f"Сырьё: {result.fermentable_label} · "
+        f"{result.fermentable_label} · "
         f"⚖️ {format_decimal(result.sugar_kg)} кг\n"
         f"💧 Вода: {format_decimal(result.water_l)} л · "
         f"🪣 Объём: {format_decimal(result.volume_l)} л\n"
