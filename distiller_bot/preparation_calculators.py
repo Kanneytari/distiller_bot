@@ -14,6 +14,7 @@ from .keyboards import (
     sugar_wash_result_keyboard,
 )
 from .models import DrinkEvent
+from .preparation_composition import save_preparation_composition
 from .process_stages import stage_type_for_title
 from .processes import get_owned_process, render_process_list
 from .sugar_wash import (
@@ -105,18 +106,19 @@ async def save_sugar_wash_calculation(
     *,
     process_id: int,
     result: SugarWashResult,
-) -> None:
+) -> DrinkEvent:
     data = result.as_event_data()
-    data["stage"] = "Подготовка"
-    session.add(
-        DrinkEvent(
-            drink_id=process_id,
-            event_type="sugar_wash_calculation",
-            title="Расчёт сахарной браги",
-            data=data,
-        )
+    data.update({"stage": "Подготовка", "source": "calculator"})
+    event = DrinkEvent(
+        drink_id=process_id,
+        event_type="sugar_wash_calculation",
+        title="Расчёт сахарной браги",
+        data=data,
     )
+    session.add(event)
     await session.commit()
+    await session.refresh(event)
+    return event
 
 
 async def show_result(
@@ -131,7 +133,7 @@ async def show_result(
         sugar_wash_result=result.as_event_data(),
     )
     await message.answer(
-        result_text(result),
+        f"✅ <b>Состав процесса обновлён</b>\n\n{result_text(result)}",
         reply_markup=sugar_wash_result_keyboard(process_id),
     )
 
@@ -190,7 +192,7 @@ async def sugar_wash_menu_handler(
         latest_result = result_from_data(latest_event.data if latest_event else None)
         if latest_result is not None:
             text += (
-                "\n\n<b>Последний сохранённый расчёт:</b>\n"
+                "\n\n<b>Текущий состав:</b>\n"
                 f"{compact_result_text(latest_result)}"
             )
         await callback.message.edit_text(
@@ -232,8 +234,9 @@ async def sugar_wash_menu_handler(
 async def sugar_wash_value_handler(
     message: Message,
     state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    if message.text is None:
+    if message.from_user is None or message.text is None:
         return
 
     data = await state.get_data()
@@ -312,9 +315,29 @@ async def sugar_wash_value_handler(
         await message.answer("Не удалось восстановить данные расчёта. Запустите его заново.")
         return
 
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, message.from_user.id)
+        if process is None:
+            await state.clear()
+            await message.answer("Процесс не найден.")
+            return
+        if stage_type_for_title(process.current_stage) != "preparation":
+            await state.clear()
+            await message.answer("Процесс уже не находится на этапе подготовки.")
+            return
+
+        await save_sugar_wash_calculation(session, process_id=process.id, result=result)
+        await save_preparation_composition(
+            session,
+            process_id=process.id,
+            result=result,
+            source="calculator",
+        )
+
     await show_result(message, state, process_id, result)
 
 
+# Обработчик оставлен для ранее отправленных Telegram-сообщений со старой кнопкой «Сохранить».
 @router.callback_query(F.data.startswith("process:sugar-wash-save:"))
 async def sugar_wash_save_handler(
     callback: CallbackQuery,
@@ -337,7 +360,7 @@ async def sugar_wash_save_handler(
     if state_process_id != process_id or result is None:
         await state.clear()
         await callback.message.edit_text(
-            "Расчёт больше не доступен для сохранения. Выполните его заново.",
+            "Расчёт больше не доступен. Выполните его заново.",
             reply_markup=sugar_wash_menu_keyboard(process_id),
         )
         return
@@ -351,14 +374,20 @@ async def sugar_wash_save_handler(
         if stage_type_for_title(process.current_stage) != "preparation":
             await state.clear()
             await callback.message.edit_text(
-                "Расчёт не сохранён: процесс уже не находится на этапе подготовки.",
+                "Состав не обновлён: процесс уже не находится на этапе подготовки.",
                 reply_markup=process_calculators_keyboard(process.id),
             )
             return
         await save_sugar_wash_calculation(session, process_id=process.id, result=result)
+        await save_preparation_composition(
+            session,
+            process_id=process.id,
+            result=result,
+            source="calculator",
+        )
 
     await state.clear()
     await callback.message.edit_text(
-        f"✅ <b>Расчёт сохранён в процессе</b>\n\n{result_text(result)}",
+        f"✅ <b>Состав процесса обновлён</b>\n\n{result_text(result)}",
         reply_markup=sugar_wash_menu_keyboard(process_id),
     )
