@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from distiller_bot.keyboards import process_card_keyboard, sugar_wash_menu_keyboard
+from distiller_bot.preparation_calculators import parse_positive_decimal
 from distiller_bot.process_stages import stage_actions_for_stage
 from distiller_bot.sugar_wash import (
     calculate_by_sugar,
@@ -42,6 +43,13 @@ def test_high_potential_abv_shows_warning() -> None:
 
     assert "Сахарная нагрузка высокая" in text
     assert "Фактическая крепость зависит" in text
+
+
+def test_numeric_input_accepts_comma_and_rejects_non_finite_values() -> None:
+    assert parse_positive_decimal("5,5") == Decimal("5.5")
+    assert parse_positive_decimal("0") is None
+    assert parse_positive_decimal("NaN") is None
+    assert parse_positive_decimal("Infinity") is None
 
 
 def test_preparation_calculator_routes_to_sugar_wash_mvp() -> None:
