@@ -101,8 +101,10 @@ def process_short_label(process: Drink) -> str:
 
 
 def format_decimal(value: Decimal) -> str:
-    formatted = format(value, "f").rstrip("0").rstrip(".")
-    return formatted or "0"
+    formatted = format(value, "f")
+    if "." in formatted:
+        formatted = formatted.rstrip("0").rstrip(".")
+    return formatted
 
 
 def measurement_display(measurement: Measurement) -> str:
