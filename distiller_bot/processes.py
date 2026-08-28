@@ -13,7 +13,7 @@ from .keyboards import (
     process_list_keyboard,
     process_stage_keyboard,
 )
-from .models import Drink, User
+from .models import Drink, DrinkEvent, User
 
 router = Router()
 
@@ -50,7 +50,8 @@ def stage_icon(stage: str | None) -> str:
 
 def process_short_label(process: Drink) -> str:
     stage = process.current_stage or "Этап не указан"
-    return f"{stage_icon(process.current_stage)} {process.name} · {stage.lower()}"
+    label = f"{stage_icon(process.current_stage)} {process.name} · {stage.lower()}"
+    return label if len(label) <= 60 else f"{label[:57]}…"
 
 
 def process_card_text(process: Drink) -> str:
@@ -79,6 +80,50 @@ async def get_owned_process(
         .where(Drink.id == process_id, User.telegram_id == telegram_id)
     )
     return result.scalar_one_or_none()
+
+
+async def create_process(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    name: str,
+    stage: str,
+) -> Drink:
+    process = Drink(user_id=user_id, name=name, current_stage=stage, status="active")
+    session.add(process)
+    await session.flush()
+    session.add(
+        DrinkEvent(
+            drink_id=process.id,
+            event_type="created",
+            title="Процесс добавлен",
+            data={"stage": stage},
+        )
+    )
+    await session.commit()
+    await session.refresh(process)
+    return process
+
+
+async def change_process_stage(
+    session: AsyncSession,
+    *,
+    process: Drink,
+    stage: str,
+) -> Drink:
+    previous_stage = process.current_stage
+    process.current_stage = stage
+    session.add(
+        DrinkEvent(
+            drink_id=process.id,
+            event_type="stage_changed",
+            title="Изменён этап",
+            data={"from": previous_stage, "to": stage},
+        )
+    )
+    await session.commit()
+    await session.refresh(process)
+    return process
 
 
 async def render_process_list(
@@ -200,11 +245,7 @@ async def process_stage_handler(
                 await state.clear()
                 await callback.message.edit_text("Сначала запустите бота командой /start.")
                 return
-
-            process = Drink(user_id=user.id, name=name, current_stage=stage, status="active")
-            session.add(process)
-            await session.commit()
-            await session.refresh(process)
+            process = await create_process(session, user_id=user.id, name=name, stage=stage)
 
         await state.clear()
         await callback.message.edit_text(
@@ -225,9 +266,7 @@ async def process_stage_handler(
                 await state.clear()
                 await render_process_list(callback, session_factory)
                 return
-            process.current_stage = stage
-            await session.commit()
-            await session.refresh(process)
+            process = await change_process_stage(session, process=process, stage=stage)
 
         await state.clear()
         await callback.message.edit_text(
@@ -264,8 +303,7 @@ async def process_custom_stage_handler(
                 await state.clear()
                 await message.answer("Не удалось создать процесс. Откройте раздел заново.")
                 return
-            process = Drink(user_id=user.id, name=name, current_stage=stage, status="active")
-            session.add(process)
+            process = await create_process(session, user_id=user.id, name=name, stage=stage)
         elif mode == "change":
             process_id = data.get("process_id")
             if not isinstance(process_id, int):
@@ -276,13 +314,10 @@ async def process_custom_stage_handler(
                 await state.clear()
                 await message.answer("Процесс не найден.")
                 return
-            process.current_stage = stage
+            process = await change_process_stage(session, process=process, stage=stage)
         else:
             await state.clear()
             return
-
-        await session.commit()
-        await session.refresh(process)
 
     await state.clear()
     await message.answer(
