@@ -9,6 +9,7 @@ router = Router()
 
 BLOCKED_STAGE_CALLBACKS = {
     "process:stage:custom",
+    "process:stage:distillation",
     "process:stage:dilution",
     "process:stage:aging",
     "process:stage:ready",
@@ -17,10 +18,12 @@ BLOCKED_STAGE_CALLBACKS = {
 
 @router.callback_query(F.data.in_(BLOCKED_STAGE_CALLBACKS))
 async def blocked_stage_handler(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer(
-        "Выберите один из доступных этапов.",
-        show_alert=True,
-    )
+    if callback.data == "process:stage:distillation":
+        alert_text = "Перегонка теперь разделена на первую и вторую. Выберите нужный этап."
+    else:
+        alert_text = "Выберите один из доступных этапов."
+
+    await callback.answer(alert_text, show_alert=True)
     if callback.message is None:
         return
 
