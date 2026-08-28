@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from .equipment import router as equipment_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
 from .models import User
+from .processes import router as processes_router
 
 router = Router()
+router.include_router(processes_router)
 router.include_router(equipment_router)
 
 
@@ -65,14 +67,13 @@ async def main_menu_handler(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text(main_menu_text(), reply_markup=main_menu_keyboard())
 
 
-@router.callback_query(F.data.in_({"menu:drinks", "menu:recipes", "menu:calculators"}))
+@router.callback_query(F.data.in_({"menu:recipes", "menu:calculators"}))
 async def section_placeholder_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.clear()
 
     section = (callback.data or "").removeprefix("menu:")
     titles = {
-        "drinks": "🧪 Мои процессы",
         "recipes": "📖 Рецепты",
         "calculators": "🧮 Калькуляторы",
     }
