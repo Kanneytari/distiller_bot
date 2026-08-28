@@ -11,33 +11,28 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .keyboards import (
+    process_calculators_keyboard,
     process_card_keyboard,
+    process_completed_keyboard,
     process_input_cancel_keyboard,
     process_list_keyboard,
     process_measurement_type_keyboard,
     process_stage_keyboard,
 )
 from .models import Drink, DrinkEvent, Measurement, User
+from .process_stages import (
+    STAGE_TITLES,
+    stage_actions_for_stage,
+    stage_icon,
+    stage_type_for_title,
+)
 
 router = Router()
 
-STAGES: dict[str, str] = {
-    "preparation": "Подготовка",
-    "fermentation": "Брожение",
-    "distillation": "Перегонка",
-    "dilution": "Разбавление",
-    "aging": "Выдержка",
-    "ready": "Готово",
-}
-
-STAGE_ICONS: dict[str, str] = {
-    "Подготовка": "🧰",
-    "Брожение": "🟡",
-    "Перегонка": "🔥",
-    "Разбавление": "💧",
-    "Выдержка": "🪵",
-    "Готово": "✅",
-}
+PROCESS_CALCULATORS_TEXT = (
+    "🧮 <b>Калькуляторы</b>\n\n"
+    "Здесь будут доступны расчёты, подходящие для текущего этапа."
+)
 
 MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
     "temperature": {
@@ -68,39 +63,40 @@ MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
 
 DEFAULT_MEASUREMENT_ORDER = ["temperature", "density", "abv", "volume"]
 STAGE_MEASUREMENT_ORDER: dict[str, list[str]] = {
-    "Подготовка": ["volume", "density", "temperature", "abv"],
-    "Брожение": ["density", "temperature", "volume", "abv"],
-    "Перегонка": ["abv", "volume", "temperature", "density"],
-    "Разбавление": ["abv", "volume", "temperature", "density"],
-    "Выдержка": ["abv", "volume", "temperature", "density"],
-    "Готово": ["abv", "volume", "temperature", "density"],
+    "preparation": ["volume", "density", "temperature", "abv"],
+    "fermentation": ["density", "temperature", "volume", "abv"],
+    "distillation": ["abv", "volume", "temperature", "density"],
+    "drink_preparation": ["abv", "volume", "temperature", "density"],
+    "bottling": ["abv", "volume", "temperature", "density"],
 }
 
 STAGE_QUICK_MEASUREMENTS: dict[str, list[tuple[str, str]]] = {
-    "Подготовка": [
+    "preparation": [
         ("volume", "💧 Объём"),
         ("density", "📏 Начальная плотность"),
     ],
-    "Брожение": [
+    "fermentation": [
         ("density", "📏 Плотность"),
         ("temperature", "🌡 Температура"),
     ],
-    "Перегонка": [
+    "distillation": [
         ("abv", "🥃 Крепость"),
         ("volume", "💧 Объём"),
     ],
-    "Разбавление": [
+    "drink_preparation": [
         ("abv", "🥃 Текущая крепость"),
         ("volume", "💧 Объём"),
     ],
-    "Выдержка": [
-        ("abv", "🥃 Крепость"),
-        ("volume", "💧 Объём"),
-    ],
-    "Готово": [
+    "bottling": [
         ("abv", "🥃 Итоговая крепость"),
         ("volume", "💧 Итоговый объём"),
     ],
+}
+
+LEGACY_MEASUREMENT_STAGE_TYPES: dict[str, str] = {
+    "Разбавление": "drink_preparation",
+    "Выдержка": "drink_preparation",
+    "Готово": "bottling",
 }
 
 VALUE_RE = re.compile(r"^\s*([+-]?\d+(?:[.,]\d+)?)\s*(.*?)\s*$")
@@ -113,12 +109,7 @@ class ProcessState(StatesGroup):
     waiting_rename = State()
     waiting_measurement_label = State()
     waiting_measurement_value = State()
-
-
-def stage_icon(stage: str | None) -> str:
-    if stage is None:
-        return "🧪"
-    return STAGE_ICONS.get(stage, "🧪")
+    waiting_note = State()
 
 
 def process_short_label(process: Drink) -> str:
@@ -147,8 +138,18 @@ def measurement_display(measurement: Measurement) -> str:
     return f"{icon} {escape(label)}: {format_decimal(measurement.value)}{unit}"
 
 
+def measurement_stage_type(stage: str | None) -> str | None:
+    stage_type = stage_type_for_title(stage)
+    if stage_type is not None:
+        return stage_type
+    if stage is None:
+        return None
+    return LEGACY_MEASUREMENT_STAGE_TYPES.get(stage)
+
+
 def quick_measurements_for_stage(stage: str | None) -> list[tuple[str, str]]:
-    return list(STAGE_QUICK_MEASUREMENTS.get(stage or "", []))
+    stage_type = measurement_stage_type(stage)
+    return list(STAGE_QUICK_MEASUREMENTS.get(stage_type or "", []))
 
 
 def process_card_text(process: Drink, latest_measurement: Measurement | None = None) -> str:
@@ -172,14 +173,16 @@ def process_card_text(process: Drink, latest_measurement: Measurement | None = N
 
 
 def process_card_markup(process: Drink):
-    return process_card_keyboard(
-        process.id,
-        quick_measurements_for_stage(process.current_stage),
-    )
+    actions = [
+        (action.key, action.label)
+        for action in stage_actions_for_stage(process.current_stage)
+    ]
+    return process_card_keyboard(process.id, actions)
 
 
 def measurement_types_for_stage(stage: str | None) -> list[tuple[str, str]]:
-    order = STAGE_MEASUREMENT_ORDER.get(stage or "", DEFAULT_MEASUREMENT_ORDER)
+    stage_type = measurement_stage_type(stage)
+    order = STAGE_MEASUREMENT_ORDER.get(stage_type or "", DEFAULT_MEASUREMENT_ORDER)
     return [
         (
             measurement_type,
@@ -212,6 +215,13 @@ def measurement_value_error(measurement_type: str, value: Decimal) -> str | None
     if measurement_type in {"density", "volume"} and value <= 0:
         return "Значение должно быть больше нуля."
     return None
+
+
+def callback_process_id(callback: CallbackQuery) -> int | None:
+    try:
+        return int((callback.data or "").rsplit(":", 1)[-1])
+    except ValueError:
+        return None
 
 
 async def get_user(session: AsyncSession, telegram_id: int) -> User | None:
@@ -344,6 +354,40 @@ async def create_measurement(
     return measurement
 
 
+async def create_process_note(
+    session: AsyncSession,
+    *,
+    process: Drink,
+    text: str,
+) -> None:
+    session.add(
+        DrinkEvent(
+            drink_id=process.id,
+            event_type="note",
+            title="Заметка",
+            text=text,
+            data={"stage": process.current_stage},
+        )
+    )
+    await session.commit()
+
+
+async def complete_process(session: AsyncSession, *, process: Drink) -> Drink:
+    process.status = "completed"
+    process.completed_at = datetime.now(UTC)
+    session.add(
+        DrinkEvent(
+            drink_id=process.id,
+            event_type="completed",
+            title="Процесс завершён",
+            data={"stage": process.current_stage},
+        )
+    )
+    await session.commit()
+    await session.refresh(process)
+    return process
+
+
 async def render_process_list(
     callback: CallbackQuery,
     session_factory: async_sessionmaker[AsyncSession],
@@ -376,6 +420,33 @@ async def render_process_list(
 
     items = [(process.id, process_short_label(process)) for process in processes]
     await callback.message.edit_text(text, reply_markup=process_list_keyboard(items))
+
+
+async def show_stage_selector(
+    callback: CallbackQuery,
+    state: FSMContext,
+    process: Drink,
+    *,
+    completed: bool,
+) -> None:
+    await state.clear()
+    await state.update_data(mode="change", process_id=process.id)
+    await state.set_state(ProcessState.choosing_stage)
+
+    if completed:
+        text = (
+            f"✅ <b>{stage_icon(process.current_stage)} "
+            f"{escape(process.current_stage or 'Этап')} завершён</b>\n\n"
+            "Выберите следующий этап:"
+        )
+    else:
+        text = f"🔄 <b>{escape(process.name)}</b>\n\nВыберите новый этап:"
+
+    if callback.message:
+        await callback.message.edit_text(
+            text,
+            reply_markup=process_stage_keyboard(process.id),
+        )
 
 
 @router.callback_query(F.data == "menu:drinks")
@@ -453,7 +524,7 @@ async def process_stage_handler(
         )
         return
 
-    stage = STAGES.get(stage_key)
+    stage = STAGE_TITLES.get(stage_key)
     if stage is None:
         return
 
@@ -564,9 +635,8 @@ async def process_view_handler(
     if callback.message is None:
         return
 
-    try:
-        process_id = int((callback.data or "").rsplit(":", 1)[-1])
-    except ValueError:
+    process_id = callback_process_id(callback)
+    if process_id is None:
         return
 
     async with session_factory() as session:
@@ -595,9 +665,8 @@ async def process_measurement_handler(
     if callback.message is None:
         return
 
-    try:
-        process_id = int((callback.data or "").rsplit(":", 1)[-1])
-    except ValueError:
+    process_id = callback_process_id(callback)
+    if process_id is None:
         return
 
     async with session_factory() as session:
@@ -611,7 +680,8 @@ async def process_measurement_handler(
     await state.update_data(process_id=process_id)
     await callback.message.edit_text(
         f"➕ <b>Новый замер · {escape(process.name)}</b>\n\n"
-        f"Этап: {stage_icon(process.current_stage)} {escape(process.current_stage or 'Не указан')}\n\n"
+        f"Этап: {stage_icon(process.current_stage)} "
+        f"{escape(process.current_stage or 'Не указан')}\n\n"
         "Что измерили? Для текущего этапа наиболее типичные варианты показаны первыми.",
         reply_markup=process_measurement_type_keyboard(
             process_id,
@@ -763,6 +833,106 @@ async def process_measurement_value_handler(
     )
 
 
+@router.callback_query(F.data.startswith("process:note:"))
+async def process_note_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    process_id = callback_process_id(callback)
+    if process_id is None:
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, callback.from_user.id)
+
+    if process is None:
+        await render_process_list(callback, session_factory)
+        return
+
+    await state.clear()
+    await state.update_data(process_id=process_id)
+    await state.set_state(ProcessState.waiting_note)
+    await callback.message.edit_text(
+        f"📝 <b>Заметка · {escape(process.name)}</b>\n\n"
+        f"Этап: {stage_icon(process.current_stage)} "
+        f"{escape(process.current_stage or 'Не указан')}\n\n"
+        "Введите текст заметки.",
+        reply_markup=process_input_cancel_keyboard(process_id),
+    )
+
+
+@router.message(ProcessState.waiting_note)
+async def process_note_value_handler(
+    message: Message,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    if message.from_user is None or message.text is None:
+        return
+
+    text = message.text.strip()
+    if not text:
+        await message.answer("Введите текст заметки.")
+        return
+    if len(text) > 3000:
+        await message.answer("Заметка слишком длинная. Используйте не больше 3000 символов.")
+        return
+
+    data = await state.get_data()
+    process_id = data.get("process_id")
+    if not isinstance(process_id, int):
+        await state.clear()
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, message.from_user.id)
+        if process is None:
+            await state.clear()
+            await message.answer("Процесс не найден.")
+            return
+        await create_process_note(session, process=process, text=text)
+        latest_measurement = await get_latest_measurement(session, process.id)
+
+    await state.clear()
+    await message.answer(
+        f"✅ Заметка сохранена\n\n{process_card_text(process, latest_measurement)}",
+        reply_markup=process_card_markup(process),
+    )
+
+
+@router.callback_query(F.data.startswith("process:calculators:"))
+async def process_calculators_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await callback.answer()
+    await state.clear()
+    if callback.message is None:
+        return
+
+    process_id = callback_process_id(callback)
+    if process_id is None:
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, callback.from_user.id)
+
+    if process is None:
+        await render_process_list(callback, session_factory)
+        return
+
+    await callback.message.edit_text(
+        PROCESS_CALCULATORS_TEXT,
+        reply_markup=process_calculators_keyboard(process.id),
+    )
+
+
 @router.callback_query(F.data.startswith("process:rename:"))
 async def process_rename_handler(
     callback: CallbackQuery,
@@ -773,9 +943,8 @@ async def process_rename_handler(
     if callback.message is None:
         return
 
-    try:
-        process_id = int((callback.data or "").rsplit(":", 1)[-1])
-    except ValueError:
+    process_id = callback_process_id(callback)
+    if process_id is None:
         return
 
     async with session_factory() as session:
@@ -835,6 +1004,30 @@ async def process_rename_value_handler(
     )
 
 
+@router.callback_query(F.data.startswith("process:complete-stage:"))
+async def process_complete_stage_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    process_id = callback_process_id(callback)
+    if process_id is None:
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, callback.from_user.id)
+
+    if process is None:
+        await render_process_list(callback, session_factory)
+        return
+
+    await show_stage_selector(callback, state, process, completed=True)
+
+
 @router.callback_query(F.data.startswith("process:change-stage:"))
 async def process_change_stage_handler(
     callback: CallbackQuery,
@@ -845,9 +1038,8 @@ async def process_change_stage_handler(
     if callback.message is None:
         return
 
-    try:
-        process_id = int((callback.data or "").rsplit(":", 1)[-1])
-    except ValueError:
+    process_id = callback_process_id(callback)
+    if process_id is None:
         return
 
     async with session_factory() as session:
@@ -857,10 +1049,46 @@ async def process_change_stage_handler(
         await render_process_list(callback, session_factory)
         return
 
+    await show_stage_selector(callback, state, process, completed=False)
+
+
+@router.callback_query(F.data.startswith("process:complete:"))
+async def process_complete_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await callback.answer()
     await state.clear()
-    await state.update_data(mode="change", process_id=process_id)
-    await state.set_state(ProcessState.choosing_stage)
+    if callback.message is None:
+        return
+
+    process_id = callback_process_id(callback)
+    if process_id is None:
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, callback.from_user.id)
+        if process is None:
+            await render_process_list(callback, session_factory)
+            return
+        if stage_type_for_title(process.current_stage) != "bottling":
+            latest_measurement = await get_latest_measurement(session, process.id)
+        else:
+            process = await complete_process(session, process=process)
+            latest_measurement = None
+
+    if process.status != "completed":
+        await callback.message.edit_text(
+            process_card_text(process, latest_measurement),
+            reply_markup=process_card_markup(process),
+        )
+        return
+
     await callback.message.edit_text(
-        f"🔄 <b>{escape(process.name)}</b>\n\nВыберите новый этап:",
-        reply_markup=process_stage_keyboard(process_id),
+        "✅ <b>Процесс завершён</b>\n\n"
+        f"🧪 {escape(process.name)}\n"
+        f"Этап: {stage_icon(process.current_stage)} "
+        f"{escape(process.current_stage or 'Розлив')}",
+        reply_markup=process_completed_keyboard(),
     )
