@@ -1,3 +1,5 @@
+from html import escape
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -36,6 +38,7 @@ STAGE_ICONS: dict[str, str] = {
 
 class ProcessState(StatesGroup):
     waiting_name = State()
+    choosing_stage = State()
     waiting_custom_stage = State()
 
 
@@ -54,8 +57,8 @@ def process_card_text(process: Drink) -> str:
     stage = process.current_stage or "Не указан"
     created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "—"
     return (
-        f"🧪 <b>{process.name}</b>\n\n"
-        f"Этап: {stage}\n"
+        f"🧪 <b>{escape(process.name)}</b>\n\n"
+        f"Этап: {escape(stage)}\n"
         f"Добавлено: {created_at}"
     )
 
@@ -149,6 +152,7 @@ async def process_name_handler(message: Message, state: FSMContext) -> None:
         return
 
     await state.update_data(mode="create", name=name)
+    await state.set_state(ProcessState.choosing_stage)
     await message.answer(
         "На каком этапе вы сейчас?",
         reply_markup=process_stage_keyboard(),
@@ -340,7 +344,8 @@ async def process_change_stage_handler(
 
     await state.clear()
     await state.update_data(mode="change", process_id=process_id)
+    await state.set_state(ProcessState.choosing_stage)
     await callback.message.edit_text(
-        f"🔄 <b>{process.name}</b>\n\nВыберите новый этап:",
+        f"🔄 <b>{escape(process.name)}</b>\n\nВыберите новый этап:",
         reply_markup=process_stage_keyboard(process_id),
     )
