@@ -5,21 +5,22 @@ from distiller_bot.processes import process_card_text
 def make_process() -> Drink:
     return Drink(
         user_id=1,
-        name="Сахарная брага",
+        name="Брага",
         current_stage="Подготовка",
         status="active",
     )
 
 
-def test_process_card_shows_latest_preparation_composition() -> None:
+def test_process_card_shows_selected_fermentable_in_composition() -> None:
     process = make_process()
     composition = DrinkEvent(
         drink_id=1,
         event_type="preparation_composition",
-        title="Состав сахарной браги",
+        title="Состав браги",
         data={
-            "water_l": "21.94",
-            "sugar_kg": "5.10",
+            "fermentable": "glucose",
+            "fermentable_kg": "5.37",
+            "water_l": "21.78",
             "volume_l": "25.00",
             "potential_abv": "12.0",
         },
@@ -29,12 +30,13 @@ def test_process_card_shows_latest_preparation_composition() -> None:
     text = process_card_text(process)
 
     assert "🍬 <b>Состав браги:</b>" in text
-    assert "💧 Вода: 21.94 л · 🍬 Сахар: 5.1 кг" in text
-    assert "🪣 Объём: 25 л · 📈 Потенциальная крепость: ~12%" in text
+    assert "Сырьё: Глюкоза · ⚖️ 5.37 кг" in text
+    assert "💧 Вода: 21.78 л · 🪣 Объём: 25 л" in text
+    assert "📈 Потенциальная крепость: ~12%" in text
     assert "Сохранённый расчёт" not in text
 
 
-def test_process_card_accepts_legacy_saved_calculation_as_composition() -> None:
+def test_process_card_accepts_legacy_saved_calculation_as_sucrose_composition() -> None:
     process = make_process()
     legacy_calculation = DrinkEvent(
         drink_id=1,
@@ -52,6 +54,7 @@ def test_process_card_accepts_legacy_saved_calculation_as_composition() -> None:
     text = process_card_text(process)
 
     assert "🍬 <b>Состав браги:</b>" in text
+    assert "Сырьё: Сахар · ⚖️ 5.1 кг" in text
 
 
 def test_process_card_ignores_broken_preparation_composition() -> None:
@@ -59,7 +62,7 @@ def test_process_card_ignores_broken_preparation_composition() -> None:
     composition = DrinkEvent(
         drink_id=1,
         event_type="preparation_composition",
-        title="Состав сахарной браги",
+        title="Состав браги",
         data={"water_l": "not-a-number"},
     )
     setattr(process, "_latest_preparation_composition", composition)
