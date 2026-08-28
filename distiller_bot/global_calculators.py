@@ -54,7 +54,7 @@ def decimal_from_state(data: dict[str, object], key: str) -> Decimal | None:
     return value if value.is_finite() and value > 0 else None
 
 
-def calculation_prompt(mode: str, fermentable: str) -> tuple[str, str]:
+def calculation_prompt(mode: str, fermentable: str = DEFAULT_FERMENTABLE) -> tuple[str, str]:
     label = fermentable_label(fermentable)
     if mode == "volume":
         return (
@@ -74,16 +74,22 @@ def calculation_prompt(mode: str, fermentable: str) -> tuple[str, str]:
     )
 
 
-@router.callback_query(F.data.startswith("calculators:sugar-wash"))
+@router.callback_query(
+    F.data.in_(
+        {
+            "calculators:sugar-wash",
+            "calculators:sugar-wash:volume",
+            "calculators:sugar-wash:sugar",
+            "calculators:sugar-wash:check",
+        }
+    )
+)
 async def global_sugar_wash_menu_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     if callback.message is None:
         return
 
     parts = (callback.data or "").split(":")
-    if len(parts) not in {2, 3}:
-        return
-
     mode = parts[2] if len(parts) == 3 else None
     if mode is None:
         await state.clear()
@@ -95,9 +101,6 @@ async def global_sugar_wash_menu_handler(callback: CallbackQuery, state: FSMCont
             "📈 <b>Проверить состав</b> — уже знаю сырьё и воду.",
             reply_markup=global_sugar_wash_menu_keyboard(),
         )
-        return
-
-    if mode not in {"volume", "sugar", "check"}:
         return
 
     await state.clear()
