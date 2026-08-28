@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .calculator_keyboards import calculators_menu_keyboard, preparation_calculators_keyboard
+from .drink_preparation import router as drink_preparation_router
 from .equipment import router as equipment_router
 from .fermentation import router as fermentation_router
 from .first_distillation import router as first_distillation_router
@@ -27,6 +28,7 @@ router.include_router(preparation_composition_router)
 router.include_router(fermentation_router)
 router.include_router(first_distillation_router)
 router.include_router(second_distillation_router)
+router.include_router(drink_preparation_router)
 router.include_router(stage_selection_guard_router)
 router.include_router(processes_router)
 router.include_router(equipment_router)
