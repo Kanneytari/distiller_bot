@@ -1,9 +1,10 @@
 from decimal import Decimal
 
 from distiller_bot.keyboards import process_calculators_keyboard, process_card_keyboard
-from distiller_bot.models import Drink, Measurement
+from distiller_bot.models import Drink, DrinkEvent, Measurement
 from distiller_bot.process_stages import stage_actions_for_stage, stage_icon, stage_type_for_title
 from distiller_bot.processes import (
+    NOTE_PREVIEW_LIMIT,
     PROCESS_CALCULATORS_TEXT,
     format_decimal,
     measurement_types_for_stage,
@@ -195,3 +196,34 @@ def test_process_card_shows_latest_measurement() -> None:
 
     assert "Последний замер:" in text
     assert "📏 Плотность: 1.026 SG" in text
+
+
+def test_process_card_shows_latest_note_and_escapes_it() -> None:
+    process = make_process(name="Сахарная брага", stage="Брожение")
+    note = DrinkEvent(
+        drink_id=1,
+        event_type="note",
+        title="Заметка",
+        text="Проверить <плотность> завтра",
+    )
+
+    text = process_card_text(process, latest_note=note)
+
+    assert "📝 <b>Последняя заметка:</b>" in text
+    assert "Проверить &lt;плотность&gt; завтра" in text
+
+
+def test_process_card_truncates_long_note_preview() -> None:
+    process = make_process(name="Сахарная брага", stage="Брожение")
+    note = DrinkEvent(
+        drink_id=1,
+        event_type="note",
+        title="Заметка",
+        text="А" * (NOTE_PREVIEW_LIMIT + 100),
+    )
+
+    text = process_card_text(process, latest_note=note)
+    note_block = text.split("📝 <b>Последняя заметка:</b>\n", 1)[1].split("\n\n", 1)[0]
+
+    assert len(note_block) == NOTE_PREVIEW_LIMIT
+    assert note_block.endswith("…")
