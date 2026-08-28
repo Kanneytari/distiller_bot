@@ -7,29 +7,33 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .keyboards import (
-    process_calculators_keyboard,
-    sugar_wash_input_keyboard,
-    sugar_wash_menu_keyboard,
-    sugar_wash_result_keyboard,
-)
+from .keyboards import process_calculators_keyboard
 from .models import DrinkEvent
 from .preparation_composition import save_preparation_composition
+from .preparation_keyboards import (
+    process_sugar_wash_fermentable_keyboard,
+    process_sugar_wash_input_keyboard,
+    process_sugar_wash_menu_keyboard,
+    process_sugar_wash_result_keyboard,
+)
 from .process_stages import stage_type_for_title
 from .processes import get_owned_process, render_process_list
 from .sugar_wash import (
+    DEFAULT_FERMENTABLE,
     SugarWashResult,
     calculate_by_sugar,
     calculate_by_volume,
     calculate_from_composition,
     format_decimal,
+    normalize_fermentable,
+    result_from_event_data,
     result_text,
 )
 
 router = Router()
 
 MAX_INPUT_VOLUME_L = Decimal("10000")
-MAX_INPUT_SUGAR_KG = Decimal("1000")
+MAX_INPUT_FERMENTABLE_KG = Decimal("1000")
 MAX_TARGET_ABV = Decimal("25")
 
 
@@ -59,28 +63,10 @@ def decimal_from_state(data: dict[str, object], key: str) -> Decimal | None:
     return value if value.is_finite() and value > 0 else None
 
 
-def result_from_data(data: dict[str, object] | None) -> SugarWashResult | None:
-    if not data:
-        return None
-    try:
-        result = SugarWashResult(
-            mode=str(data["mode"]),
-            water_l=Decimal(str(data["water_l"])),
-            sugar_kg=Decimal(str(data["sugar_kg"])),
-            volume_l=Decimal(str(data["volume_l"])),
-            potential_abv=Decimal(str(data["potential_abv"])),
-        )
-    except (KeyError, InvalidOperation):
-        return None
-    values = (result.water_l, result.sugar_kg, result.volume_l, result.potential_abv)
-    return result if all(value.is_finite() and value > 0 for value in values) else None
-
-
 def compact_result_text(result: SugarWashResult) -> str:
     return (
-        f"💧 {format_decimal(result.water_l)} л · "
-        f"🍬 {format_decimal(result.sugar_kg)} кг\n"
-        f"🪣 {format_decimal(result.volume_l)} л · "
+        f"🍬 {result.fermentable_label} · ⚖️ {format_decimal(result.sugar_kg)} кг\n"
+        f"💧 {format_decimal(result.water_l)} л · 🪣 {format_decimal(result.volume_l)} л · "
         f"📈 ~{format_decimal(result.potential_abv)}%"
     )
 
@@ -112,7 +98,7 @@ async def save_sugar_wash_calculation(
     event = DrinkEvent(
         drink_id=process_id,
         event_type="sugar_wash_calculation",
-        title="Расчёт сахарной браги",
+        title="Расчёт браги",
         data=data,
     )
     session.add(event)
@@ -134,7 +120,26 @@ async def show_result(
     )
     await message.answer(
         f"✅ <b>Состав процесса обновлён</b>\n\n{result_text(result)}",
-        reply_markup=sugar_wash_result_keyboard(process_id),
+        reply_markup=process_sugar_wash_result_keyboard(process_id),
+    )
+
+
+def first_prompt(mode: str, fermentable_label: str) -> tuple[str, str]:
+    if mode == "volume":
+        return (
+            "volume",
+            "🪣 <b>Расчёт по объёму</b>\n\n"
+            f"Сырьё: <b>{fermentable_label}</b>.\n"
+            "Какой итоговый объём браги хотите получить?\n"
+            "Введите число в литрах, например <code>25</code>.",
+        )
+
+    title = "⚖️ Расчёт по количеству сырья" if mode == "sugar" else "📈 Проверка состава"
+    return (
+        "amount",
+        f"<b>{title}</b>\n\n"
+        f"Сырьё: <b>{fermentable_label}</b>.\n"
+        "Сколько используете? Введите количество в килограммах, например <code>6</code>.",
     )
 
 
@@ -175,7 +180,7 @@ async def sugar_wash_menu_handler(
         await state.clear()
         await callback.message.edit_text(
             "🧮 <b>Калькуляторы</b>\n\n"
-            "Расчёт сахарной браги доступен на этапе 🧰 Подготовка.",
+            "Расчёт браги доступен на этапе 🧰 Подготовка.",
             reply_markup=process_calculators_keyboard(process.id),
         )
         return
@@ -183,21 +188,18 @@ async def sugar_wash_menu_handler(
     if mode is None:
         await state.clear()
         text = (
-            "🧮 <b>Сахарная брага</b>\n\n"
+            "🧮 <b>Расчёт браги</b>\n\n"
             "Выберите, от каких данных хотите считать:\n\n"
             "🪣 <b>По объёму</b> — знаю желаемый объём браги.\n"
-            "🍬 <b>По сахару</b> — знаю, сколько сахара есть.\n"
-            "📈 <b>Проверить состав</b> — уже знаю сахар и воду."
+            "⚖️ <b>По количеству сырья</b> — знаю, сколько сырья есть.\n"
+            "📈 <b>Проверить состав</b> — уже знаю сырьё и воду."
         )
-        latest_result = result_from_data(latest_event.data if latest_event else None)
+        latest_result = result_from_event_data(latest_event.data if latest_event else None)
         if latest_result is not None:
-            text += (
-                "\n\n<b>Текущий состав:</b>\n"
-                f"{compact_result_text(latest_result)}"
-            )
+            text += "\n\n<b>Текущий состав:</b>\n" + compact_result_text(latest_result)
         await callback.message.edit_text(
             text,
-            reply_markup=sugar_wash_menu_keyboard(process.id),
+            reply_markup=process_sugar_wash_menu_keyboard(process.id),
         )
         return
 
@@ -205,28 +207,55 @@ async def sugar_wash_menu_handler(
         return
 
     await state.clear()
-    await state.set_state(SugarWashState.waiting_value)
     await state.update_data(process_id=process_id, calc_mode=mode)
+    await callback.message.edit_text(
+        "🍬 <b>Выберите сырьё</b>\n\n"
+        "Для глюкозы и фруктозы расчёт учитывает их немного меньший "
+        "теоретический выход этанола на килограмм по сравнению с сахарозой.",
+        reply_markup=process_sugar_wash_fermentable_keyboard(process_id, mode),
+    )
 
-    if mode == "volume":
-        await state.update_data(calc_step="volume")
-        prompt = (
-            "🪣 <b>Расчёт по объёму</b>\n\n"
-            "Какой итоговый объём браги хотите получить?\n"
-            "Введите число в литрах, например <code>25</code>."
-        )
-    else:
-        await state.update_data(calc_step="sugar")
-        title = "🍬 Расчёт по сахару" if mode == "sugar" else "📈 Проверка состава"
-        prompt = (
-            f"<b>{title}</b>\n\n"
-            "Сколько сахара используете?\n"
-            "Введите количество в килограммах, например <code>6</code>."
-        )
 
+@router.callback_query(F.data.startswith("process:sugar-wash-material:"))
+async def sugar_wash_material_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    parts = (callback.data or "").split(":")
+    if len(parts) != 5:
+        return
+    try:
+        process_id = int(parts[2])
+    except ValueError:
+        return
+    mode = parts[3]
+    fermentable = normalize_fermentable(parts[4])
+    if mode not in {"volume", "sugar", "check"}:
+        return
+
+    await state.clear()
+    await state.set_state(SugarWashState.waiting_value)
+    await state.update_data(
+        process_id=process_id,
+        calc_mode=mode,
+        fermentable=fermentable,
+    )
+    step, prompt = first_prompt(mode, result_from_event_data({
+        "mode": "check",
+        "water_l": "1",
+        "fermentable_kg": "1",
+        "volume_l": "1",
+        "potential_abv": "1",
+        "fermentable": fermentable,
+    }).fermentable_label)
+    await state.update_data(calc_step=step)
     await callback.message.edit_text(
         prompt,
-        reply_markup=sugar_wash_input_keyboard(process_id),
+        reply_markup=process_sugar_wash_input_keyboard(process_id),
     )
 
 
@@ -243,6 +272,7 @@ async def sugar_wash_value_handler(
     process_id = data.get("process_id")
     mode = data.get("calc_mode")
     step = data.get("calc_step")
+    fermentable = normalize_fermentable(data.get("fermentable", DEFAULT_FERMENTABLE))
     if not isinstance(process_id, int) or not isinstance(mode, str) or not isinstance(step, str):
         await state.clear()
         return
@@ -257,8 +287,8 @@ async def sugar_wash_value_handler(
     if step in {"volume", "water"} and value > MAX_INPUT_VOLUME_L:
         await message.answer("Для MVP укажите объём не больше 10 000 л.")
         return
-    if step == "sugar" and value > MAX_INPUT_SUGAR_KG:
-        await message.answer("Для MVP укажите не больше 1 000 кг сахара.")
+    if step == "amount" and value > MAX_INPUT_FERMENTABLE_KG:
+        await message.answer("Для MVP укажите не больше 1 000 кг сырья.")
         return
     if step == "target_abv" and value > MAX_TARGET_ABV:
         await message.answer("Укажите потенциальную крепость от 1 до 25 %.")
@@ -270,25 +300,25 @@ async def sugar_wash_value_handler(
             "📈 Какую потенциальную крепость хотите заложить?\n"
             "Введите процент, например <code>12</code>.\n\n"
             "Это расчётная цель, а не гарантированная фактическая крепость.",
-            reply_markup=sugar_wash_input_keyboard(process_id),
+            reply_markup=process_sugar_wash_input_keyboard(process_id),
         )
         return
 
-    if mode == "sugar" and step == "sugar":
-        await state.update_data(sugar_kg=str(value), calc_step="target_abv")
+    if mode == "sugar" and step == "amount":
+        await state.update_data(amount_kg=str(value), calc_step="target_abv")
         await message.answer(
             "📈 Какую потенциальную крепость хотите заложить?\n"
             "Введите процент, например <code>12</code>.",
-            reply_markup=sugar_wash_input_keyboard(process_id),
+            reply_markup=process_sugar_wash_input_keyboard(process_id),
         )
         return
 
-    if mode == "check" and step == "sugar":
-        await state.update_data(sugar_kg=str(value), calc_step="water")
+    if mode == "check" and step == "amount":
+        await state.update_data(amount_kg=str(value), calc_step="water")
         await message.answer(
             "💧 Сколько воды используете?\n"
             "Введите количество в литрах, например <code>25</code>.",
-            reply_markup=sugar_wash_input_keyboard(process_id),
+            reply_markup=process_sugar_wash_input_keyboard(process_id),
         )
         return
 
@@ -300,15 +330,15 @@ async def sugar_wash_value_handler(
     if mode == "volume" and step == "target_abv":
         volume_l = decimal_from_state(data, "volume_l")
         if volume_l is not None:
-            result = calculate_by_volume(volume_l, value)
+            result = calculate_by_volume(volume_l, value, fermentable)
     elif mode == "sugar" and step == "target_abv":
-        sugar_kg = decimal_from_state(data, "sugar_kg")
-        if sugar_kg is not None:
-            result = calculate_by_sugar(sugar_kg, value)
+        amount_kg = decimal_from_state(data, "amount_kg")
+        if amount_kg is not None:
+            result = calculate_by_sugar(amount_kg, value, fermentable)
     elif mode == "check" and step == "water":
-        sugar_kg = decimal_from_state(data, "sugar_kg")
-        if sugar_kg is not None:
-            result = calculate_from_composition(value, sugar_kg)
+        amount_kg = decimal_from_state(data, "amount_kg")
+        if amount_kg is not None:
+            result = calculate_from_composition(value, amount_kg, fermentable)
 
     if result is None:
         await state.clear()
@@ -337,57 +367,10 @@ async def sugar_wash_value_handler(
     await show_result(message, state, process_id, result)
 
 
-# Обработчик оставлен для ранее отправленных Telegram-сообщений со старой кнопкой «Сохранить».
+# Совместимость со старыми сообщениями с кнопкой «Сохранить».
 @router.callback_query(F.data.startswith("process:sugar-wash-save:"))
 async def sugar_wash_save_handler(
     callback: CallbackQuery,
     state: FSMContext,
-    session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await callback.answer()
-    if callback.message is None:
-        return
-
-    try:
-        process_id = int((callback.data or "").rsplit(":", 1)[-1])
-    except ValueError:
-        return
-
-    data = await state.get_data()
-    state_process_id = data.get("process_id")
-    raw_result = data.get("sugar_wash_result")
-    result = result_from_data(raw_result if isinstance(raw_result, dict) else None)
-    if state_process_id != process_id or result is None:
-        await state.clear()
-        await callback.message.edit_text(
-            "Расчёт больше не доступен. Выполните его заново.",
-            reply_markup=sugar_wash_menu_keyboard(process_id),
-        )
-        return
-
-    async with session_factory() as session:
-        process = await get_owned_process(session, process_id, callback.from_user.id)
-        if process is None:
-            await state.clear()
-            await render_process_list(callback, session_factory)
-            return
-        if stage_type_for_title(process.current_stage) != "preparation":
-            await state.clear()
-            await callback.message.edit_text(
-                "Состав не обновлён: процесс уже не находится на этапе подготовки.",
-                reply_markup=process_calculators_keyboard(process.id),
-            )
-            return
-        await save_sugar_wash_calculation(session, process_id=process.id, result=result)
-        await save_preparation_composition(
-            session,
-            process_id=process.id,
-            result=result,
-            source="calculator",
-        )
-
-    await state.clear()
-    await callback.message.edit_text(
-        f"✅ <b>Состав процесса обновлён</b>\n\n{result_text(result)}",
-        reply_markup=sugar_wash_menu_keyboard(process_id),
-    )
+    await callback.answer("Теперь состав сохраняется автоматически.", show_alert=True)
