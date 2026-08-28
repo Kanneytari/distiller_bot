@@ -8,6 +8,7 @@ def calculators_menu_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="🫧 Брожение", callback_data="calculators:fermentation")
     builder.button(text="⚗️ Первая перегонка", callback_data="calculators:first-distillation")
     builder.button(text="⚗️ Вторая перегонка", callback_data="calculators:second-distillation")
+    builder.button(text="💧 Подготовка напитка", callback_data="calculators:drink-preparation")
     builder.button(text="🏠 Меню", callback_data="menu:main")
     builder.adjust(1)
     return builder.as_markup()
