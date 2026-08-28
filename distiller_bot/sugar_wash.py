@@ -44,17 +44,20 @@ class SugarWashResult:
         return fermentable_label(self.fermentable)
 
     def as_event_data(self) -> dict[str, str]:
+        coefficient = grams_per_l_per_abv(self.fermentable)
         return {
             "mode": self.mode,
             "fermentable": self.fermentable,
             "water_l": str(self.water_l),
-            # sugar_kg оставлен для чтения ранее сохранённых данных.
+            # sugar_kg и старые coefficient-ключи оставлены для обратной совместимости.
             "sugar_kg": str(self.sugar_kg),
             "fermentable_kg": str(self.sugar_kg),
             "volume_l": str(self.volume_l),
             "potential_abv": str(self.potential_abv),
-            "g_per_l_per_abv": str(grams_per_l_per_abv(self.fermentable)),
+            "g_per_l_per_abv": str(coefficient),
             "fermentable_volume_l_per_kg": str(FERMENTABLE_VOLUME_L_PER_KG),
+            "sugar_g_per_l_per_abv": str(coefficient),
+            "sugar_volume_l_per_kg": str(FERMENTABLE_VOLUME_L_PER_KG),
         }
 
 
