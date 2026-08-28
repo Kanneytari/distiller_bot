@@ -50,11 +50,12 @@ def test_regular_stage_uses_next_stage_and_has_no_manual_stage_button() -> None:
     assert all(callback != "process:change-stage:42" for _text, callback in buttons)
 
 
-def test_process_card_uses_process_emoji_instead_of_back_arrow() -> None:
+def test_process_card_uses_back_emoji_for_processes() -> None:
     buttons = button_pairs("Подготовка")
 
-    assert ("🧪 Процессы", "menu:drinks") in buttons
+    assert ("🔙 Процессы", "menu:drinks") in buttons
     assert all(text != "← Процессы" for text, _callback in buttons)
+    assert all(text != "🧪 Процессы" for text, _callback in buttons)
 
 
 def test_stage_selector_only_offers_predefined_stages() -> None:
@@ -68,12 +69,21 @@ def test_stage_selector_only_offers_predefined_stages() -> None:
     assert buttons == [
         ("🧰 Подготовка", "process:stage:preparation"),
         ("🫧 Брожение", "process:stage:fermentation"),
-        ("⚗️ Перегонка", "process:stage:distillation"),
+        ("⚗️ Первая перегонка", "process:stage:first_distillation"),
+        ("⚗️ Вторая перегонка", "process:stage:second_distillation"),
         ("💧 Подготовка напитка", "process:stage:drink_preparation"),
         ("🍾 Розлив", "process:stage:bottling"),
         ("❌ Отмена", "process:view:42"),
     ]
     assert all(callback != "process:stage:custom" for _text, callback in buttons)
+    assert all(callback != "process:stage:distillation" for _text, callback in buttons)
+
+
+def test_first_distillation_has_dedicated_result_action() -> None:
+    buttons = button_pairs("Первая перегонка")
+
+    assert ("✏️ Результат", "process:first-distillation:42") in buttons
+    assert ("➡️ Следующий этап", "process:complete-stage:42") in buttons
 
 
 def test_bottling_finishes_process_instead_of_showing_next_stage() -> None:
