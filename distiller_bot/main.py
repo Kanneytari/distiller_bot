@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from .config import get_settings
-from .database import create_session_factory
+from .database import create_engine, create_session_factory, init_database
 from .handlers import router
 
 
@@ -14,7 +14,9 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
     settings = get_settings()
-    session_factory = create_session_factory(settings)
+    engine = create_engine(settings)
+    await init_database(engine)
+    session_factory = create_session_factory(engine)
 
     bot = Bot(
         token=settings.bot_token,
@@ -27,6 +29,7 @@ async def main() -> None:
         await dispatcher.start_polling(bot, session_factory=session_factory)
     finally:
         await bot.session.close()
+        await engine.dispose()
 
 
 if __name__ == "__main__":
