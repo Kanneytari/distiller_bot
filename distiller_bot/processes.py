@@ -175,7 +175,7 @@ def process_card_text(
     latest_note: DrinkEvent | None = None,
 ) -> str:
     stage = process.current_stage or "Не указан"
-    created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "—"
+    created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "-"
     text = (
         f"🧪 <b>{escape(process.name)}</b>\n\n"
         f"Этап: {stage_icon(process.current_stage)} {escape(stage)}\n"
@@ -490,7 +490,7 @@ async def render_process_list(
             "🧪 <b>Мои процессы</b>\n\n"
             "Здесь можно вести текущие приготовления: сохранять этапы, замеры, "
             "заметки и напоминания.\n\n"
-            "Можно добавить процесс на любом этапе — от брожения до готового продукта."
+            "Можно добавить процесс на любом этапе - от брожения до готового продукта."
         )
 
     items = [(process.id, process_short_label(process)) for process in processes]
