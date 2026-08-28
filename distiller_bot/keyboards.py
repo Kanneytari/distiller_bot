@@ -63,14 +63,20 @@ def process_card_keyboard(
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     primary_actions: list[tuple[str, str]] = []
+    secondary_actions: list[tuple[str, str]] = []
     completion_action: tuple[str, str] | None = None
 
     for action_key, label in stage_actions:
         if action_key in {"complete_stage", "complete_process"}:
             completion_action = (action_key, label)
+        elif action_key in {"note", "calculators"}:
+            secondary_actions.append((action_key, label))
         else:
             primary_actions.append((action_key, label))
 
+    row_sizes: list[int] = []
+
+    # Главное действие этапа (замер / параметры / результат) остаётся заметным.
     for action_key, label in primary_actions:
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
         if callback_template is None:
@@ -79,6 +85,21 @@ def process_card_keyboard(
             text=label,
             callback_data=callback_template.format(process_id=process_id),
         )
+        row_sizes.append(1)
+
+    # Заметка и калькуляторы — компактные вторичные действия в одной строке.
+    secondary_count = 0
+    for action_key, label in secondary_actions:
+        callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
+        if callback_template is None:
+            continue
+        builder.button(
+            text=label,
+            callback_data=callback_template.format(process_id=process_id),
+        )
+        secondary_count += 1
+    if secondary_count:
+        row_sizes.append(secondary_count)
 
     compact_action_count = 2
     if completion_action is not None:
@@ -94,16 +115,14 @@ def process_card_keyboard(
     # Служебные действия процесса держим в одной компактной строке.
     builder.button(text="✏️ Имя", callback_data=f"process:rename:{process_id}")
     builder.button(text="🔄 Этап", callback_data=f"process:change-stage:{process_id}")
+    row_sizes.append(compact_action_count)
 
     # Навигация тоже не должна растягивать карточку по вертикали.
     builder.button(text="← Процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
+    row_sizes.append(2)
 
-    builder.adjust(
-        *([1] * len(primary_actions)),
-        compact_action_count,
-        2,
-    )
+    builder.adjust(*row_sizes)
     return builder.as_markup()
 
 
