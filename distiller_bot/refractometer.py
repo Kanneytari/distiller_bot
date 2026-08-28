@@ -36,6 +36,8 @@ def corrected_final_sg(initial_brix: Decimal, current_brix: Decimal) -> Decimal:
         raise ValueError("Initial Brix must be between 0 and 50")
     if not Decimal("0") <= current_brix <= initial_brix:
         raise ValueError("Current Brix must be between 0 and initial Brix")
+    if current_brix == initial_brix:
+        return brix_to_sg(initial_brix)
 
     return (
         Decimal("1")
