@@ -42,14 +42,27 @@ def parse_positive_decimal(text: str) -> Decimal | None:
         value = Decimal(text.strip().replace(",", "."))
     except InvalidOperation:
         return None
-    return value if value > 0 else None
+    if not value.is_finite() or value <= 0:
+        return None
+    return value
+
+
+def decimal_from_state(data: dict[str, object], key: str) -> Decimal | None:
+    raw_value = data.get(key)
+    if raw_value is None:
+        return None
+    try:
+        value = Decimal(str(raw_value))
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() and value > 0 else None
 
 
 def result_from_data(data: dict[str, object] | None) -> SugarWashResult | None:
     if not data:
         return None
     try:
-        return SugarWashResult(
+        result = SugarWashResult(
             mode=str(data["mode"]),
             water_l=Decimal(str(data["water_l"])),
             sugar_kg=Decimal(str(data["sugar_kg"])),
@@ -58,6 +71,8 @@ def result_from_data(data: dict[str, object] | None) -> SugarWashResult | None:
         )
     except (KeyError, InvalidOperation):
         return None
+    values = (result.water_l, result.sugar_kg, result.volume_l, result.potential_abv)
+    return result if all(value.is_finite() and value > 0 for value in values) else None
 
 
 def compact_result_text(result: SugarWashResult) -> str:
@@ -231,7 +246,9 @@ async def sugar_wash_value_handler(
 
     value = parse_positive_decimal(message.text)
     if value is None:
-        await message.answer("Введите положительное число. Например: <code>25</code> или <code>5,5</code>.")
+        await message.answer(
+            "Введите положительное число. Например: <code>25</code> или <code>5,5</code>."
+        )
         return
 
     if step in {"volume", "water"} and value > MAX_INPUT_VOLUME_L:
@@ -278,17 +295,21 @@ async def sugar_wash_value_handler(
 
     result: SugarWashResult | None = None
     if mode == "volume" and step == "target_abv":
-        volume_l = Decimal(str(data.get("volume_l")))
-        result = calculate_by_volume(volume_l, value)
+        volume_l = decimal_from_state(data, "volume_l")
+        if volume_l is not None:
+            result = calculate_by_volume(volume_l, value)
     elif mode == "sugar" and step == "target_abv":
-        sugar_kg = Decimal(str(data.get("sugar_kg")))
-        result = calculate_by_sugar(sugar_kg, value)
+        sugar_kg = decimal_from_state(data, "sugar_kg")
+        if sugar_kg is not None:
+            result = calculate_by_sugar(sugar_kg, value)
     elif mode == "check" and step == "water":
-        sugar_kg = Decimal(str(data.get("sugar_kg")))
-        result = calculate_from_composition(value, sugar_kg)
+        sugar_kg = decimal_from_state(data, "sugar_kg")
+        if sugar_kg is not None:
+            result = calculate_from_composition(value, sugar_kg)
 
     if result is None:
         await state.clear()
+        await message.answer("Не удалось восстановить данные расчёта. Запустите его заново.")
         return
 
     await show_result(message, state, process_id, result)
@@ -311,7 +332,8 @@ async def sugar_wash_save_handler(
 
     data = await state.get_data()
     state_process_id = data.get("process_id")
-    result = result_from_data(data.get("sugar_wash_result"))
+    raw_result = data.get("sugar_wash_result")
+    result = result_from_data(raw_result if isinstance(raw_result, dict) else None)
     if state_process_id != process_id or result is None:
         await state.clear()
         await callback.message.edit_text(
