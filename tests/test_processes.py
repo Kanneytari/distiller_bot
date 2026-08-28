@@ -121,13 +121,22 @@ def test_calculators_placeholder_has_back_to_process() -> None:
     assert button.callback_data == "process:view:42"
 
 
-def test_fermentation_prioritizes_density_and_temperature() -> None:
+def test_fermentation_measurements_do_not_offer_density() -> None:
     types = measurement_types_for_stage("Брожение")
 
-    assert [measurement_type for measurement_type, _label in types[:2]] == [
-        "density",
+    assert [measurement_type for measurement_type, _label in types] == [
         "temperature",
+        "volume",
+        "abv",
     ]
+
+
+def test_no_stage_offers_density_measurement() -> None:
+    for stage in ["Подготовка", "Брожение", "Перегонка", "Подготовка напитка", "Розлив"]:
+        assert all(
+            measurement_type != "density"
+            for measurement_type, _label in measurement_types_for_stage(stage)
+        )
 
 
 def test_repeated_distillation_keeps_distillation_measurement_order() -> None:
@@ -139,11 +148,11 @@ def test_repeated_distillation_keeps_distillation_measurement_order() -> None:
 def test_quick_measurements_change_with_stage() -> None:
     assert quick_measurements_for_stage("Подготовка") == [
         ("volume", "💧 Объём"),
-        ("density", "📏 Начальная плотность"),
+        ("temperature", "🌡 Температура"),
     ]
     assert quick_measurements_for_stage("Брожение") == [
-        ("density", "📏 Плотность"),
         ("temperature", "🌡 Температура"),
+        ("volume", "💧 Объём"),
     ]
     assert quick_measurements_for_stage("Готово") == [
         ("abv", "🥃 Итоговая крепость"),
@@ -161,13 +170,13 @@ def test_process_card_shows_contextual_suggestions() -> None:
     text = process_card_text(process)
 
     assert "Сейчас может пригодиться:" in text
-    assert "📏 Плотность · 🌡 Температура" in text
+    assert "🌡 Температура · 💧 Объём" in text
 
 
 def test_measurement_value_accepts_comma_and_default_unit() -> None:
-    parsed = parse_measurement_value("1,026", "SG")
+    parsed = parse_measurement_value("24,5", "°C")
 
-    assert parsed == (Decimal("1.026"), "SG")
+    assert parsed == (Decimal("24.5"), "°C")
 
 
 def test_measurement_value_accepts_explicit_unit() -> None:
@@ -186,16 +195,16 @@ def test_process_card_shows_latest_measurement() -> None:
     process = make_process(name="Сахарная брага", stage="Брожение")
     measurement = Measurement(
         drink_id=1,
-        measurement_type="density",
-        value=Decimal("1.0260"),
-        unit="SG",
-        label="Плотность",
+        measurement_type="temperature",
+        value=Decimal("24.0000"),
+        unit="°C",
+        label="Температура",
     )
 
     text = process_card_text(process, measurement)
 
     assert "Последний замер:" in text
-    assert "📏 Плотность: 1.026 SG" in text
+    assert "🌡 Температура: 24 °C" in text
 
 
 def test_process_card_shows_latest_note_and_escapes_it() -> None:
@@ -204,13 +213,13 @@ def test_process_card_shows_latest_note_and_escapes_it() -> None:
         drink_id=1,
         event_type="note",
         title="Заметка",
-        text="Проверить <плотность> завтра",
+        text="Проверить <температуру> завтра",
     )
 
     text = process_card_text(process, latest_note=note)
 
     assert "📝 <b>Последняя заметка:</b>" in text
-    assert "Проверить &lt;плотность&gt; завтра" in text
+    assert "Проверить &lt;температуру&gt; завтра" in text
 
 
 def test_process_card_truncates_long_note_preview() -> None:
