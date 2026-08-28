@@ -39,7 +39,7 @@ def _bisect(function) -> float:
     if high_value == 0:
         return high
     if low_value * high_value > 0:
-        raise ValueError("Value is outside the alcoholometric model range")
+        return low if abs(low_value) <= abs(high_value) else high
     for _ in range(80):
         middle = (low + high) / 2.0
         middle_value = function(middle)
@@ -64,4 +64,5 @@ def correct_alcoholmeter_abv(observed_abv: Decimal, temperature_c: Decimal) -> D
     density_t = density_20 * (1.0 - 25e-6 * (t - 20.0))
     p = _bisect(lambda candidate: _density(candidate, t) - density_t)
     corrected = Decimal(str(_q_from_p(p) * 100.0))
+    corrected = min(Decimal("100"), max(Decimal("0"), corrected))
     return corrected.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
