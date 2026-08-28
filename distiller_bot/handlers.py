@@ -1,13 +1,16 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from .equipment import router as equipment_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
 from .models import User
 
 router = Router()
+router.include_router(equipment_router)
 
 
 async def ensure_user(
@@ -46,29 +49,32 @@ def main_menu_text() -> str:
 @router.message(CommandStart())
 async def start_handler(
     message: Message,
+    state: FSMContext,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
+    await state.clear()
     await ensure_user(message, session_factory)
     await message.answer(main_menu_text(), reply_markup=main_menu_keyboard())
 
 
 @router.callback_query(F.data == "menu:main")
-async def main_menu_handler(callback: CallbackQuery) -> None:
+async def main_menu_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
+    await state.clear()
     if callback.message:
         await callback.message.edit_text(main_menu_text(), reply_markup=main_menu_keyboard())
 
 
-@router.callback_query(F.data.startswith("menu:"))
-async def section_placeholder_handler(callback: CallbackQuery) -> None:
+@router.callback_query(F.data.in_({"menu:drinks", "menu:recipes", "menu:calculators"}))
+async def section_placeholder_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
+    await state.clear()
 
     section = (callback.data or "").removeprefix("menu:")
     titles = {
         "drinks": "🥃 Напитки",
         "recipes": "📖 Рецепты",
         "calculators": "🧮 Калькуляторы",
-        "equipment": "⚙️ Оборудование",
     }
     title = titles.get(section)
     if title is None or callback.message is None:
