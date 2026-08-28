@@ -11,8 +11,10 @@ from distiller_bot.second_distillation import (
     dilution_result,
     grouped_summary,
     heads_guidance,
+    parse_blend_pairs,
     summarize_cuts,
 )
+from distiller_bot.second_distillation_blend_ui import BLEND_INPUT_TEXT
 from distiller_bot.second_distillation_keyboards import second_distillation_calculators_keyboard
 
 
@@ -103,6 +105,18 @@ def test_grouped_summary_keeps_heads_hearts_and_tails_separate() -> None:
     assert grouped["heads"][0] == Decimal("0.20")
     assert grouped["hearts"][0] == Decimal("1.00")
     assert grouped["tails"][0] == Decimal("0.50")
+
+
+def test_average_strength_accepts_space_separator() -> None:
+    assert parse_blend_pairs("2,5 48\n1,5 32") == [
+        (Decimal("2.5"), Decimal("48")),
+        (Decimal("1.5"), Decimal("32")),
+    ]
+
+
+def test_average_strength_hint_uses_space_separator() -> None:
+    assert "<code>2,5 48\n1,5 32</code>" in BLEND_INPUT_TEXT
+    assert " x " not in BLEND_INPUT_TEXT
 
 
 def test_second_distillation_process_card_routes_to_dedicated_workflow() -> None:
