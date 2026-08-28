@@ -6,6 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 PROCESS_ACTION_CALLBACKS: dict[str, str] = {
     "measure": "process:measure:{process_id}",
+    "composition": "process:composition:{process_id}",
     "note": "process:note:{process_id}",
     "calculators": "process:calculators:{process_id}",
     "sugar_wash": "process:sugar-wash:{process_id}",
@@ -77,7 +78,7 @@ def process_card_keyboard(
 
     row_sizes: list[int] = []
 
-    # Главное действие этапа (замер / параметры / результат) остаётся заметным.
+    # Главное действие этапа (состав / замер / параметры / результат) остаётся заметным.
     for action_key, label in primary_actions:
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
         if callback_template is None:
@@ -186,10 +187,9 @@ def sugar_wash_input_keyboard(process_id: int) -> InlineKeyboardMarkup:
 
 def sugar_wash_result_keyboard(process_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="💾 Сохранить", callback_data=f"process:sugar-wash-save:{process_id}")
     builder.button(text="↩️ Новый расчёт", callback_data=f"process:sugar-wash:{process_id}")
     builder.button(text="← К процессу", callback_data=f"process:view:{process_id}")
-    builder.adjust(1, 2)
+    builder.adjust(2)
     return builder.as_markup()
 
 
