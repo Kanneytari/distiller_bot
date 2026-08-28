@@ -7,6 +7,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 PROCESS_ACTION_CALLBACKS: dict[str, str] = {
     "measure": "process:measure:{process_id}",
     "composition": "process:composition:{process_id}",
+    "first_distillation_result": "process:first-distillation:{process_id}",
     "note": "process:note:{process_id}",
     "calculators": "process:calculators:{process_id}",
     "sugar_wash": "process:sugar-wash:{process_id}",
@@ -46,7 +47,14 @@ def process_stage_keyboard(process_id: int | None = None) -> InlineKeyboardMarku
     builder = InlineKeyboardBuilder()
     builder.button(text="🧰 Подготовка", callback_data="process:stage:preparation")
     builder.button(text="🫧 Брожение", callback_data="process:stage:fermentation")
-    builder.button(text="⚗️ Перегонка", callback_data="process:stage:distillation")
+    builder.button(
+        text="⚗️ Первая перегонка",
+        callback_data="process:stage:first_distillation",
+    )
+    builder.button(
+        text="⚗️ Вторая перегонка",
+        callback_data="process:stage:second_distillation",
+    )
     builder.button(
         text="💧 Подготовка напитка",
         callback_data="process:stage:drink_preparation",
@@ -54,7 +62,7 @@ def process_stage_keyboard(process_id: int | None = None) -> InlineKeyboardMarku
     builder.button(text="🍾 Розлив", callback_data="process:stage:bottling")
     callback_data = f"process:view:{process_id}" if process_id is not None else "menu:drinks"
     builder.button(text="❌ Отмена", callback_data=callback_data)
-    builder.adjust(2, 2, 1, 1)
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
 
@@ -123,7 +131,7 @@ def process_card_keyboard(
     row_sizes.append(compact_action_count)
 
     # Навигация тоже не должна растягивать карточку по вертикали.
-    builder.button(text="🧪 Процессы", callback_data="menu:drinks")
+    builder.button(text="🔙 Процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
     row_sizes.append(2)
 
@@ -198,7 +206,7 @@ def sugar_wash_result_keyboard(process_id: int) -> InlineKeyboardMarkup:
 
 def process_completed_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="🧪 Мои процессы", callback_data="menu:drinks")
+    builder.button(text="🔙 Мои процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
     builder.adjust(1)
     return builder.as_markup()
