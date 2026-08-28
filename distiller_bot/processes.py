@@ -40,6 +40,7 @@ class ProcessState(StatesGroup):
     waiting_name = State()
     choosing_stage = State()
     waiting_custom_stage = State()
+    waiting_rename = State()
 
 
 def stage_icon(stage: str | None) -> str:
@@ -119,6 +120,27 @@ async def change_process_stage(
             event_type="stage_changed",
             title="Изменён этап",
             data={"from": previous_stage, "to": stage},
+        )
+    )
+    await session.commit()
+    await session.refresh(process)
+    return process
+
+
+async def rename_process(
+    session: AsyncSession,
+    *,
+    process: Drink,
+    name: str,
+) -> Drink:
+    previous_name = process.name
+    process.name = name
+    session.add(
+        DrinkEvent(
+            drink_id=process.id,
+            event_type="renamed",
+            title="Процесс переименован",
+            data={"from": previous_name, "to": name},
         )
     )
     await session.commit()
@@ -357,6 +379,77 @@ async def process_view_handler(
 
     await callback.message.edit_text(
         process_card_text(process),
+        reply_markup=process_card_keyboard(process.id),
+    )
+
+
+@router.callback_query(F.data.startswith("process:rename:"))
+async def process_rename_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    try:
+        process_id = int((callback.data or "").rsplit(":", 1)[-1])
+    except ValueError:
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, callback.from_user.id)
+
+    if process is None:
+        await render_process_list(callback, session_factory)
+        return
+
+    await state.clear()
+    await state.update_data(process_id=process_id)
+    await state.set_state(ProcessState.waiting_rename)
+    await callback.message.edit_text(
+        f"✏️ <b>Переименовать процесс</b>\n\n"
+        f"Текущее название: {escape(process.name)}\n\n"
+        "Введите новое название.",
+        reply_markup=process_input_cancel_keyboard(process_id),
+    )
+
+
+@router.message(ProcessState.waiting_rename)
+async def process_rename_value_handler(
+    message: Message,
+    state: FSMContext,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    if message.from_user is None or message.text is None:
+        return
+
+    name = message.text.strip()
+    if not name:
+        await message.answer("Введите новое название процесса.")
+        return
+    if len(name) > 255:
+        await message.answer("Название слишком длинное. Используйте не больше 255 символов.")
+        return
+
+    data = await state.get_data()
+    process_id = data.get("process_id")
+    if not isinstance(process_id, int):
+        await state.clear()
+        return
+
+    async with session_factory() as session:
+        process = await get_owned_process(session, process_id, message.from_user.id)
+        if process is None:
+            await state.clear()
+            await message.answer("Процесс не найден.")
+            return
+        process = await rename_process(session, process=process, name=name)
+
+    await state.clear()
+    await message.answer(
+        f"✅ Процесс переименован\n\n{process_card_text(process)}",
         reply_markup=process_card_keyboard(process.id),
     )
 
