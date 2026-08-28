@@ -4,8 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Numeric, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -25,7 +24,7 @@ class TimestampMixin:
 class User(TimestampMixin, Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
     username: Mapped[str | None] = mapped_column(String(255))
     first_name: Mapped[str | None] = mapped_column(String(255))
@@ -34,7 +33,7 @@ class User(TimestampMixin, Base):
 class Equipment(TimestampMixin, Base):
     __tablename__ = "equipment"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -42,13 +41,13 @@ class Equipment(TimestampMixin, Base):
     equipment_type: Mapped[str] = mapped_column(String(50), nullable=False)
     capacity_l: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     power_kw: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
-    properties: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    properties: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
 
 
 class Recipe(TimestampMixin, Base):
     __tablename__ = "recipes"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     owner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -63,7 +62,7 @@ class Recipe(TimestampMixin, Base):
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     recipe_id: Mapped[int] = mapped_column(
         ForeignKey("recipes.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -76,7 +75,7 @@ class RecipeIngredient(Base):
 class RecipeStep(Base):
     __tablename__ = "recipe_steps"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     recipe_id: Mapped[int] = mapped_column(
         ForeignKey("recipes.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -102,7 +101,7 @@ class SavedRecipe(Base):
 class Drink(TimestampMixin, Base):
     __tablename__ = "drinks"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -131,7 +130,7 @@ class DrinkEquipment(Base):
 class Measurement(Base):
     __tablename__ = "measurements"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     drink_id: Mapped[int] = mapped_column(
         ForeignKey("drinks.id", ondelete="CASCADE"), index=True, nullable=False
     )
@@ -148,14 +147,14 @@ class Measurement(Base):
 class DrinkEvent(Base):
     __tablename__ = "drink_events"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     drink_id: Mapped[int] = mapped_column(
         ForeignKey("drinks.id", ondelete="CASCADE"), index=True, nullable=False
     )
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255))
     text: Mapped[str | None] = mapped_column(Text)
-    data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    data: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True, nullable=False
     )
@@ -164,7 +163,7 @@ class DrinkEvent(Base):
 class Reminder(Base):
     __tablename__ = "reminders"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
