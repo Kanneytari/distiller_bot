@@ -33,6 +33,7 @@ PROCESS_CALCULATORS_TEXT = (
     "🧮 <b>Калькуляторы</b>\n\n"
     "Здесь будут доступны расчёты, подходящие для текущего этапа."
 )
+NOTE_PREVIEW_LIMIT = 500
 
 MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
     "temperature": {
@@ -138,6 +139,16 @@ def measurement_display(measurement: Measurement) -> str:
     return f"{icon} {escape(label)}: {format_decimal(measurement.value)}{unit}"
 
 
+def note_preview(note: DrinkEvent | None) -> str | None:
+    if note is None or not note.text:
+        return None
+
+    text = note.text.strip()
+    if len(text) > NOTE_PREVIEW_LIMIT:
+        text = f"{text[: NOTE_PREVIEW_LIMIT - 1].rstrip()}…"
+    return escape(text)
+
+
 def measurement_stage_type(stage: str | None) -> str | None:
     stage_type = stage_type_for_title(stage)
     if stage_type is not None:
@@ -152,7 +163,11 @@ def quick_measurements_for_stage(stage: str | None) -> list[tuple[str, str]]:
     return list(STAGE_QUICK_MEASUREMENTS.get(stage_type or "", []))
 
 
-def process_card_text(process: Drink, latest_measurement: Measurement | None = None) -> str:
+def process_card_text(
+    process: Drink,
+    latest_measurement: Measurement | None = None,
+    latest_note: DrinkEvent | None = None,
+) -> str:
     stage = process.current_stage or "Не указан"
     created_at = process.created_at.strftime("%d.%m.%Y") if process.created_at else "—"
     text = (
@@ -163,6 +178,10 @@ def process_card_text(process: Drink, latest_measurement: Measurement | None = N
 
     if latest_measurement is not None:
         text += f"\n\nПоследний замер:\n{measurement_display(latest_measurement)}"
+
+    preview = note_preview(latest_note)
+    if preview is not None:
+        text += f"\n\n📝 <b>Последняя заметка:</b>\n{preview}"
 
     quick_measurements = quick_measurements_for_stage(process.current_stage)
     if quick_measurements:
@@ -250,6 +269,30 @@ async def get_latest_measurement(session: AsyncSession, process_id: int) -> Meas
         .limit(1)
     )
     return result.scalar_one_or_none()
+
+
+async def get_latest_note(session: AsyncSession, process_id: int) -> DrinkEvent | None:
+    result = await session.execute(
+        select(DrinkEvent)
+        .where(
+            DrinkEvent.drink_id == process_id,
+            DrinkEvent.event_type == "note",
+            DrinkEvent.text.is_not(None),
+        )
+        .order_by(DrinkEvent.created_at.desc(), DrinkEvent.id.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_process_card_context(
+    session: AsyncSession,
+    process_id: int,
+) -> tuple[Measurement | None, DrinkEvent | None]:
+    return (
+        await get_latest_measurement(session, process_id),
+        await get_latest_note(session, process_id),
+    )
 
 
 async def create_process(
@@ -359,17 +402,17 @@ async def create_process_note(
     *,
     process: Drink,
     text: str,
-) -> None:
-    session.add(
-        DrinkEvent(
-            drink_id=process.id,
-            event_type="note",
-            title="Заметка",
-            text=text,
-            data={"stage": process.current_stage},
-        )
+) -> DrinkEvent:
+    note = DrinkEvent(
+        drink_id=process.id,
+        event_type="note",
+        title="Заметка",
+        text=text,
+        data={"stage": process.current_stage},
     )
+    session.add(note)
     await session.commit()
+    return note
 
 
 async def complete_process(session: AsyncSession, *, process: Drink) -> Drink:
@@ -562,11 +605,11 @@ async def process_stage_handler(
                 await render_process_list(callback, session_factory)
                 return
             process = await change_process_stage(session, process=process, stage=stage)
-            latest_measurement = await get_latest_measurement(session, process.id)
+            latest_measurement, latest_note = await get_process_card_context(session, process.id)
 
         await state.clear()
         await callback.message.edit_text(
-            process_card_text(process, latest_measurement),
+            process_card_text(process, latest_measurement, latest_note),
             reply_markup=process_card_markup(process),
         )
 
@@ -601,6 +644,7 @@ async def process_custom_stage_handler(
                 return
             process = await create_process(session, user_id=user.id, name=name, stage=stage)
             latest_measurement = None
+            latest_note = None
         elif mode == "change":
             process_id = data.get("process_id")
             if not isinstance(process_id, int):
@@ -612,14 +656,14 @@ async def process_custom_stage_handler(
                 await message.answer("Процесс не найден.")
                 return
             process = await change_process_stage(session, process=process, stage=stage)
-            latest_measurement = await get_latest_measurement(session, process.id)
+            latest_measurement, latest_note = await get_process_card_context(session, process.id)
         else:
             await state.clear()
             return
 
     await state.clear()
     await message.answer(
-        process_card_text(process, latest_measurement),
+        process_card_text(process, latest_measurement, latest_note),
         reply_markup=process_card_markup(process),
     )
 
@@ -641,16 +685,18 @@ async def process_view_handler(
 
     async with session_factory() as session:
         process = await get_owned_process(session, process_id, callback.from_user.id)
-        latest_measurement = (
-            await get_latest_measurement(session, process.id) if process is not None else None
-        )
+        if process is not None:
+            latest_measurement, latest_note = await get_process_card_context(session, process.id)
+        else:
+            latest_measurement = None
+            latest_note = None
 
     if process is None:
         await render_process_list(callback, session_factory)
         return
 
     await callback.message.edit_text(
-        process_card_text(process, latest_measurement),
+        process_card_text(process, latest_measurement, latest_note),
         reply_markup=process_card_markup(process),
     )
 
@@ -825,10 +871,11 @@ async def process_measurement_value_handler(
             value=value,
             unit=unit,
         )
+        latest_note = await get_latest_note(session, process.id)
 
     await state.clear()
     await message.answer(
-        f"✅ Замер сохранён\n\n{process_card_text(process, measurement)}",
+        f"✅ Замер сохранён\n\n{process_card_text(process, measurement, latest_note)}",
         reply_markup=process_card_markup(process),
     )
 
@@ -895,12 +942,13 @@ async def process_note_value_handler(
             await state.clear()
             await message.answer("Процесс не найден.")
             return
-        await create_process_note(session, process=process, text=text)
+        latest_note = await create_process_note(session, process=process, text=text)
         latest_measurement = await get_latest_measurement(session, process.id)
 
     await state.clear()
     await message.answer(
-        f"✅ Заметка сохранена\n\n{process_card_text(process, latest_measurement)}",
+        f"✅ Заметка сохранена\n\n"
+        f"{process_card_text(process, latest_measurement, latest_note)}",
         reply_markup=process_card_markup(process),
     )
 
@@ -995,11 +1043,12 @@ async def process_rename_value_handler(
             await message.answer("Процесс не найден.")
             return
         process = await rename_process(session, process=process, name=name)
-        latest_measurement = await get_latest_measurement(session, process.id)
+        latest_measurement, latest_note = await get_process_card_context(session, process.id)
 
     await state.clear()
     await message.answer(
-        f"✅ Процесс переименован\n\n{process_card_text(process, latest_measurement)}",
+        f"✅ Процесс переименован\n\n"
+        f"{process_card_text(process, latest_measurement, latest_note)}",
         reply_markup=process_card_markup(process),
     )
 
@@ -1073,14 +1122,15 @@ async def process_complete_handler(
             await render_process_list(callback, session_factory)
             return
         if stage_type_for_title(process.current_stage) != "bottling":
-            latest_measurement = await get_latest_measurement(session, process.id)
+            latest_measurement, latest_note = await get_process_card_context(session, process.id)
         else:
             process = await complete_process(session, process=process)
             latest_measurement = None
+            latest_note = None
 
     if process.status != "completed":
         await callback.message.edit_text(
-            process_card_text(process, latest_measurement),
+            process_card_text(process, latest_measurement, latest_note),
             reply_markup=process_card_markup(process),
         )
         return
