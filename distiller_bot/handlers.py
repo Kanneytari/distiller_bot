@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from .calculator_keyboards import calculators_menu_keyboard, preparation_calculators_keyboard
 from .equipment import router as equipment_router
 from .keyboards import back_to_menu_keyboard, main_menu_keyboard
 from .models import User
@@ -69,21 +70,42 @@ async def main_menu_handler(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.message.edit_text(main_menu_text(), reply_markup=main_menu_keyboard())
 
 
-@router.callback_query(F.data.in_({"menu:recipes", "menu:calculators"}))
-async def section_placeholder_handler(callback: CallbackQuery, state: FSMContext) -> None:
+@router.callback_query(F.data == "menu:calculators")
+async def calculators_menu_handler(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.clear()
-
-    section = (callback.data or "").removeprefix("menu:")
-    titles = {
-        "recipes": "📖 Рецепты",
-        "calculators": "🧮 Калькуляторы",
-    }
-    title = titles.get(section)
-    if title is None or callback.message is None:
+    if callback.message is None:
         return
 
     await callback.message.edit_text(
-        f"<b>{title}</b>\n\nРаздел готов к дальнейшей реализации MVP.",
+        "🧮 <b>Калькуляторы</b>\n\n"
+        "Выберите этап, для которого нужен расчёт.",
+        reply_markup=calculators_menu_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "calculators:preparation")
+async def preparation_calculators_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await state.clear()
+    if callback.message is None:
+        return
+
+    await callback.message.edit_text(
+        "🧰 <b>Подготовка браги</b>\n\n"
+        "Калькуляторы для планирования состава перед запуском брожения.",
+        reply_markup=preparation_calculators_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "menu:recipes")
+async def section_placeholder_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await state.clear()
+    if callback.message is None:
+        return
+
+    await callback.message.edit_text(
+        "<b>📖 Рецепты</b>\n\nРаздел готов к дальнейшей реализации MVP.",
         reply_markup=back_to_menu_keyboard(),
     )
