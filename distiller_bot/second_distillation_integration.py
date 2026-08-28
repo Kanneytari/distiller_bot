@@ -1,0 +1,9 @@
+from .keyboards import PROCESS_ACTION_CALLBACKS
+
+
+PROCESS_ACTION_CALLBACKS.update(
+    {
+        "second_distillation": "process:second-distillation:{process_id}",
+        "second_distillation_calculators": "process:second-distillation-calculators:{process_id}",
+    }
+)
