@@ -178,7 +178,13 @@ async def process_add_handler(callback: CallbackQuery, state: FSMContext) -> Non
     await state.set_state(ProcessState.waiting_name)
     if callback.message:
         await callback.message.edit_text(
-            "➕ <b>Новый процесс</b>\n\nКак назовём процесс?",
+            "➕ <b>Новый процесс</b>\n\n"
+            "Как назовём процесс? Название нужно только для того, чтобы потом легко его найти.\n\n"
+            "Например:\n"
+            "• Сахарная брага\n"
+            "• Спирт-сырец\n"
+            "• Яблочный дистиллят\n"
+            "• Кальвадос на выдержке",
             reply_markup=process_input_cancel_keyboard(),
         )
 
