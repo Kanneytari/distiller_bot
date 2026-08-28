@@ -9,6 +9,7 @@ PROCESS_ACTION_CALLBACKS: dict[str, str] = {
     "composition": "process:composition:{process_id}",
     "first_distillation": "process:first-distillation:{process_id}",
     "first_distillation_calculators": "process:first-distillation-calculators:{process_id}",
+    "drink_preparation": "process:drink-preparation:{process_id}",
     "note": "process:note:{process_id}",
     "calculators": "process:calculators:{process_id}",
     "sugar_wash": "process:sugar-wash:{process_id}",
