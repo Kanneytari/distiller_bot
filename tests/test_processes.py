@@ -136,7 +136,7 @@ def test_drink_preparation_keyboard_routes_dilution() -> None:
     assert dilution.callback_data == "process:drink-preparation:42"
 
 
-def test_calculators_placeholder_has_back_to_process() -> None:
+def test_calculators_placeholder_has_back_to_drink() -> None:
     assert PROCESS_CALCULATORS_TEXT == (
         "🧮 <b>Калькуляторы</b>\n\n"
         "Здесь будут доступны расчёты, подходящие для текущего этапа."
@@ -144,7 +144,7 @@ def test_calculators_placeholder_has_back_to_process() -> None:
 
     markup = process_calculators_keyboard(42)
     button = markup.inline_keyboard[0][0]
-    assert button.text == "← К процессу"
+    assert button.text == "← К напитку"
     assert button.callback_data == "process:view:42"
 
 
