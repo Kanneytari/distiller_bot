@@ -42,12 +42,6 @@ MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
         "unit": "°C",
         "example": "24 °C",
     },
-    "density": {
-        "icon": "📏",
-        "label": "Плотность",
-        "unit": "SG",
-        "example": "1.026",
-    },
     "abv": {
         "icon": "🥃",
         "label": "Крепость",
@@ -62,23 +56,23 @@ MEASUREMENT_TYPES: dict[str, dict[str, str]] = {
     },
 }
 
-DEFAULT_MEASUREMENT_ORDER = ["temperature", "density", "abv", "volume"]
+DEFAULT_MEASUREMENT_ORDER = ["temperature", "abv", "volume"]
 STAGE_MEASUREMENT_ORDER: dict[str, list[str]] = {
-    "preparation": ["volume", "density", "temperature", "abv"],
-    "fermentation": ["density", "temperature", "volume", "abv"],
-    "distillation": ["abv", "volume", "temperature", "density"],
-    "drink_preparation": ["abv", "volume", "temperature", "density"],
-    "bottling": ["abv", "volume", "temperature", "density"],
+    "preparation": ["volume", "temperature", "abv"],
+    "fermentation": ["temperature", "volume", "abv"],
+    "distillation": ["abv", "volume", "temperature"],
+    "drink_preparation": ["abv", "volume", "temperature"],
+    "bottling": ["abv", "volume", "temperature"],
 }
 
 STAGE_QUICK_MEASUREMENTS: dict[str, list[tuple[str, str]]] = {
     "preparation": [
         ("volume", "💧 Объём"),
-        ("density", "📏 Начальная плотность"),
+        ("temperature", "🌡 Температура"),
     ],
     "fermentation": [
-        ("density", "📏 Плотность"),
         ("temperature", "🌡 Температура"),
+        ("volume", "💧 Объём"),
     ],
     "distillation": [
         ("abv", "🥃 Крепость"),
@@ -260,7 +254,7 @@ def parse_measurement_value(text: str, default_unit: str) -> tuple[Decimal, str]
 def measurement_value_error(measurement_type: str, value: Decimal) -> str | None:
     if measurement_type == "abv" and not (Decimal("0") <= value <= Decimal("100")):
         return "Крепость должна быть от 0 до 100 %."
-    if measurement_type in {"density", "volume"} and value <= 0:
+    if measurement_type == "volume" and value <= 0:
         return "Значение должно быть больше нуля."
     return None
 
@@ -311,7 +305,10 @@ async def get_owned_process(
 async def get_latest_measurement(session: AsyncSession, process_id: int) -> Measurement | None:
     result = await session.execute(
         select(Measurement)
-        .where(Measurement.drink_id == process_id)
+        .where(
+            Measurement.drink_id == process_id,
+            Measurement.measurement_type != "density",
+        )
         .order_by(Measurement.measured_at.desc(), Measurement.id.desc())
         .limit(1)
     )
@@ -894,7 +891,7 @@ async def process_measurement_value_handler(
     if parsed is None:
         await message.answer(
             "Не понял значение. Введите число, при необходимости с единицей: "
-            "например <code>24 °C</code> или <code>1.026</code>."
+            "например <code>24 °C</code> или <code>18 л</code>."
         )
         return
 
