@@ -56,7 +56,7 @@ def composition_fermentable_keyboard(process_id: int) -> InlineKeyboardMarkup:
             callback_data=f"process:composition-material:{process_id}:{key}",
         )
     builder.button(text="❌ Отмена", callback_data=f"process:composition:{process_id}")
-    builder.adjust(1)
+    builder.adjust(3, 1)
     return builder.as_markup()
 
 
@@ -96,7 +96,7 @@ def process_sugar_wash_fermentable_keyboard(
             callback_data=f"process:sugar-wash-material:{process_id}:{mode}:{key}",
         )
     builder.button(text="❌ Отмена", callback_data=f"process:sugar-wash:{process_id}")
-    builder.adjust(1)
+    builder.adjust(3, 1)
     return builder.as_markup()
 
 
@@ -133,7 +133,7 @@ def global_sugar_wash_fermentable_keyboard(mode: str) -> InlineKeyboardMarkup:
             callback_data=f"calculators:sugar-wash-material:{mode}:{key}",
         )
     builder.button(text="❌ Отмена", callback_data="calculators:sugar-wash")
-    builder.adjust(1)
+    builder.adjust(3, 1)
     return builder.as_markup()
 
 
