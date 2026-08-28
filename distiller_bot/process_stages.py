@@ -35,14 +35,24 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
             StageAction("complete_stage", "✅ Завершить брожение"),
         ),
     ),
-    "distillation": StageDefinition(
-        title="Перегонка",
+    "first_distillation": StageDefinition(
+        title="Первая перегонка",
+        icon="⚗️",
+        actions=(
+            StageAction("first_distillation_result", "✏️ Результат"),
+            StageAction("note", "📝 Заметка"),
+            StageAction("calculators", "🧮 Калькуляторы"),
+            StageAction("complete_stage", "✅ Завершить первую перегонку"),
+        ),
+    ),
+    "second_distillation": StageDefinition(
+        title="Вторая перегонка",
         icon="⚗️",
         actions=(
             StageAction("measure", "📏 Записать результат"),
             StageAction("note", "📝 Заметка"),
             StageAction("calculators", "🧮 Калькуляторы"),
-            StageAction("complete_stage", "✅ Завершить перегонку"),
+            StageAction("complete_stage", "✅ Завершить вторую перегонку"),
         ),
     ),
     "drink_preparation": StageDefinition(
@@ -66,17 +76,28 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
     ),
 }
 
-# Старые callback-ключи оставлены, чтобы ранее отправленные Telegram-кнопки
-# не становились невалидными после обновления.
+# Старые callback-ключи оставлены только для совместимости со старыми данными.
+# Новые клавиатуры используют только актуальные ключи этапов.
 STAGE_TITLES: dict[str, str] = {
     "preparation": "Подготовка",
     "fermentation": "Брожение",
+    "first_distillation": "Первая перегонка",
+    "second_distillation": "Вторая перегонка",
     "distillation": "Перегонка",
     "drink_preparation": "Подготовка напитка",
     "bottling": "Розлив",
     "dilution": "Разбавление",
     "aging": "Выдержка",
     "ready": "Готово",
+}
+
+LEGACY_STAGE_TYPES: dict[str, str] = {
+    "Перегонка": "first_distillation",
+    "Перегонка #1": "first_distillation",
+    "Перегонка #2": "second_distillation",
+    "Разбавление": "drink_preparation",
+    "Выдержка": "drink_preparation",
+    "Готово": "bottling",
 }
 
 LEGACY_STAGE_ICONS: dict[str, str] = {
@@ -93,9 +114,13 @@ GENERIC_STAGE_ACTIONS: tuple[StageAction, ...] = (
 
 
 def stage_type_for_title(stage: str | None) -> str | None:
-    """Resolve the reusable stage type without treating the display title as unique."""
+    """Resolve a stored stage title to its reusable stage type."""
     if not stage:
         return None
+
+    legacy_type = LEGACY_STAGE_TYPES.get(stage)
+    if legacy_type is not None:
+        return legacy_type
 
     for stage_type, definition in STAGE_DEFINITIONS.items():
         if stage == definition.title:
