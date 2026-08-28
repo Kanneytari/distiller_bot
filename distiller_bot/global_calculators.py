@@ -5,23 +5,27 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .calculator_keyboards import (
+from .preparation_keyboards import (
+    global_sugar_wash_fermentable_keyboard,
     global_sugar_wash_input_keyboard,
     global_sugar_wash_menu_keyboard,
     global_sugar_wash_result_keyboard,
 )
 from .sugar_wash import (
+    DEFAULT_FERMENTABLE,
     SugarWashResult,
     calculate_by_sugar,
     calculate_by_volume,
     calculate_from_composition,
+    fermentable_label,
+    normalize_fermentable,
     result_text,
 )
 
 router = Router()
 
 MAX_INPUT_VOLUME_L = Decimal("10000")
-MAX_INPUT_SUGAR_KG = Decimal("1000")
+MAX_INPUT_FERMENTABLE_KG = Decimal("1000")
 MAX_TARGET_ABV = Decimal("25")
 
 
@@ -50,21 +54,23 @@ def decimal_from_state(data: dict[str, object], key: str) -> Decimal | None:
     return value if value.is_finite() and value > 0 else None
 
 
-def calculation_prompt(mode: str) -> tuple[str, str]:
+def calculation_prompt(mode: str, fermentable: str) -> tuple[str, str]:
+    label = fermentable_label(fermentable)
     if mode == "volume":
         return (
             "volume",
             "🪣 <b>Расчёт по объёму</b>\n\n"
+            f"Сырьё: <b>{label}</b>.\n"
             "Какой итоговый объём браги хотите получить?\n"
             "Введите число в литрах, например <code>25</code>.",
         )
 
-    title = "🍬 Расчёт по сахару" if mode == "sugar" else "📈 Проверка состава"
+    title = "⚖️ Расчёт по количеству сырья" if mode == "sugar" else "📈 Проверка состава"
     return (
-        "sugar",
+        "amount",
         f"<b>{title}</b>\n\n"
-        "Сколько сахара используете?\n"
-        "Введите количество в килограммах, например <code>6</code>.",
+        f"Сырьё: <b>{label}</b>.\n"
+        "Сколько используете? Введите количество в килограммах, например <code>6</code>.",
     )
 
 
@@ -82,11 +88,11 @@ async def global_sugar_wash_menu_handler(callback: CallbackQuery, state: FSMCont
     if mode is None:
         await state.clear()
         await callback.message.edit_text(
-            "🧮 <b>Сахарная брага</b>\n\n"
+            "🧮 <b>Расчёт браги</b>\n\n"
             "Выберите, от каких данных хотите считать:\n\n"
             "🪣 <b>По объёму</b> — знаю желаемый объём браги.\n"
-            "🍬 <b>По сахару</b> — знаю, сколько сахара есть.\n"
-            "📈 <b>Проверить состав</b> — уже знаю сахар и воду.",
+            "⚖️ <b>По количеству сырья</b> — знаю, сколько сырья есть.\n"
+            "📈 <b>Проверить состав</b> — уже знаю сырьё и воду.",
             reply_markup=global_sugar_wash_menu_keyboard(),
         )
         return
@@ -94,10 +100,39 @@ async def global_sugar_wash_menu_handler(callback: CallbackQuery, state: FSMCont
     if mode not in {"volume", "sugar", "check"}:
         return
 
-    step, prompt = calculation_prompt(mode)
+    await state.clear()
+    await state.update_data(calc_mode=mode)
+    await callback.message.edit_text(
+        "🍬 <b>Выберите сырьё</b>\n\nСахар, глюкоза или фруктоза.",
+        reply_markup=global_sugar_wash_fermentable_keyboard(mode),
+    )
+
+
+@router.callback_query(F.data.startswith("calculators:sugar-wash-material:"))
+async def global_sugar_wash_material_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    await callback.answer()
+    if callback.message is None:
+        return
+
+    parts = (callback.data or "").split(":")
+    if len(parts) != 4:
+        return
+    mode = parts[2]
+    fermentable = normalize_fermentable(parts[3])
+    if mode not in {"volume", "sugar", "check"}:
+        return
+
+    step, prompt = calculation_prompt(mode, fermentable)
     await state.clear()
     await state.set_state(GlobalSugarWashState.waiting_value)
-    await state.update_data(calc_mode=mode, calc_step=step)
+    await state.update_data(
+        calc_mode=mode,
+        calc_step=step,
+        fermentable=fermentable,
+    )
     await callback.message.edit_text(prompt, reply_markup=global_sugar_wash_input_keyboard())
 
 
@@ -109,6 +144,7 @@ async def global_sugar_wash_value_handler(message: Message, state: FSMContext) -
     data = await state.get_data()
     mode = data.get("calc_mode")
     step = data.get("calc_step")
+    fermentable = normalize_fermentable(data.get("fermentable", DEFAULT_FERMENTABLE))
     if not isinstance(mode, str) or not isinstance(step, str):
         await state.clear()
         return
@@ -123,8 +159,8 @@ async def global_sugar_wash_value_handler(message: Message, state: FSMContext) -
     if step in {"volume", "water"} and value > MAX_INPUT_VOLUME_L:
         await message.answer("Для MVP укажите объём не больше 10 000 л.")
         return
-    if step == "sugar" and value > MAX_INPUT_SUGAR_KG:
-        await message.answer("Для MVP укажите не больше 1 000 кг сахара.")
+    if step == "amount" and value > MAX_INPUT_FERMENTABLE_KG:
+        await message.answer("Для MVP укажите не больше 1 000 кг сырья.")
         return
     if step == "target_abv" and (value < Decimal("1") or value > MAX_TARGET_ABV):
         await message.answer("Укажите потенциальную крепость от 1 до 25 %.")
@@ -140,8 +176,8 @@ async def global_sugar_wash_value_handler(message: Message, state: FSMContext) -
         )
         return
 
-    if mode == "sugar" and step == "sugar":
-        await state.update_data(sugar_kg=str(value), calc_step="target_abv")
+    if mode == "sugar" and step == "amount":
+        await state.update_data(amount_kg=str(value), calc_step="target_abv")
         await message.answer(
             "📈 Какую потенциальную крепость хотите заложить?\n"
             "Введите процент, например <code>12</code>.",
@@ -149,8 +185,8 @@ async def global_sugar_wash_value_handler(message: Message, state: FSMContext) -
         )
         return
 
-    if mode == "check" and step == "sugar":
-        await state.update_data(sugar_kg=str(value), calc_step="water")
+    if mode == "check" and step == "amount":
+        await state.update_data(amount_kg=str(value), calc_step="water")
         await message.answer(
             "💧 Сколько воды используете?\n"
             "Введите количество в литрах, например <code>25</code>.",
@@ -162,15 +198,15 @@ async def global_sugar_wash_value_handler(message: Message, state: FSMContext) -
     if mode == "volume" and step == "target_abv":
         volume_l = decimal_from_state(data, "volume_l")
         if volume_l is not None:
-            result = calculate_by_volume(volume_l, value)
+            result = calculate_by_volume(volume_l, value, fermentable)
     elif mode == "sugar" and step == "target_abv":
-        sugar_kg = decimal_from_state(data, "sugar_kg")
-        if sugar_kg is not None:
-            result = calculate_by_sugar(sugar_kg, value)
+        amount_kg = decimal_from_state(data, "amount_kg")
+        if amount_kg is not None:
+            result = calculate_by_sugar(amount_kg, value, fermentable)
     elif mode == "check" and step == "water":
-        sugar_kg = decimal_from_state(data, "sugar_kg")
-        if sugar_kg is not None:
-            result = calculate_from_composition(value, sugar_kg)
+        amount_kg = decimal_from_state(data, "amount_kg")
+        if amount_kg is not None:
+            result = calculate_from_composition(value, amount_kg, fermentable)
 
     if result is None:
         await state.clear()
