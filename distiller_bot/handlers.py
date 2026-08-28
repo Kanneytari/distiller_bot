@@ -17,6 +17,7 @@ from .preparation_calculators import router as preparation_calculators_router
 from .preparation_composition import router as preparation_composition_router
 from .processes import router as processes_router
 from .second_distillation import router as second_distillation_router
+from .second_distillation_blend_ui import router as second_distillation_blend_ui_router
 from . import fermentation_integration  # noqa: F401
 from . import second_distillation_integration  # noqa: F401
 from . import drink_preparation_integration  # noqa: F401
@@ -29,6 +30,7 @@ router.include_router(preparation_calculators_router)
 router.include_router(preparation_composition_router)
 router.include_router(fermentation_router)
 router.include_router(first_distillation_router)
+router.include_router(second_distillation_blend_ui_router)
 router.include_router(second_distillation_router)
 router.include_router(drink_preparation_router)
 router.include_router(drink_parameters_router)
