@@ -1,7 +1,12 @@
 from decimal import Decimal
 
-from distiller_bot.keyboards import process_card_keyboard, sugar_wash_menu_keyboard
+from distiller_bot.keyboards import (
+    process_card_keyboard,
+    sugar_wash_menu_keyboard,
+    sugar_wash_result_keyboard,
+)
 from distiller_bot.preparation_calculators import parse_positive_decimal
+from distiller_bot.preparation_composition import parse_positive_decimal as parse_composition_decimal
 from distiller_bot.process_stages import stage_actions_for_stage
 from distiller_bot.sugar_wash import (
     calculate_by_sugar,
@@ -52,6 +57,12 @@ def test_numeric_input_accepts_comma_and_rejects_non_finite_values() -> None:
     assert parse_positive_decimal("Infinity") is None
 
 
+def test_manual_composition_uses_same_numeric_rules() -> None:
+    assert parse_composition_decimal("21,9") == Decimal("21.9")
+    assert parse_composition_decimal("0") is None
+    assert parse_composition_decimal("NaN") is None
+
+
 def test_preparation_calculator_routes_to_sugar_wash_mvp() -> None:
     actions = [
         (action.key, action.label)
@@ -90,5 +101,16 @@ def test_sugar_wash_menu_has_three_modes_and_back_to_process() -> None:
         "process:sugar-wash:42:volume",
         "process:sugar-wash:42:sugar",
         "process:sugar-wash:42:check",
+        "process:view:42",
+    ]
+
+
+def test_process_calculation_result_is_applied_without_save_button() -> None:
+    markup = sugar_wash_result_keyboard(42)
+    buttons = [button for row in markup.inline_keyboard for button in row]
+
+    assert all(button.text != "💾 Сохранить" for button in buttons)
+    assert [button.callback_data for button in buttons] == [
+        "process:sugar-wash:42",
         "process:view:42",
     ]
