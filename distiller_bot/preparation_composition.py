@@ -68,7 +68,7 @@ def composition_text(result: SugarWashResult | None) -> str:
     if result is None:
         return (
             "🍬 <b>Состав браги</b>\n\n"
-            "Состав пока не задан. Укажите сырьё, его количество и воду — "
+            "Состав пока не задан. Укажите сырьё, его количество и воду - "
             "объём и потенциальную крепость бот рассчитает автоматически."
         )
 
@@ -79,7 +79,7 @@ def composition_text(result: SugarWashResult | None) -> str:
         f"💧 Вода: <b>{format_decimal(result.water_l)} л</b>\n"
         f"🪣 Объём: <b>{format_decimal(result.volume_l)} л</b>\n"
         f"📈 Потенциальная крепость: <b>~{format_decimal(result.potential_abv)}%</b>\n\n"
-        "Измените любой параметр — связанные показатели будут пересчитаны."
+        "Измените любой параметр - связанные показатели будут пересчитаны."
     )
 
 
