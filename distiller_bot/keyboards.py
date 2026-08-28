@@ -62,8 +62,16 @@ def process_card_keyboard(
     stage_actions: Iterable[tuple[str, str]],
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    primary_actions: list[tuple[str, str]] = []
+    completion_action: tuple[str, str] | None = None
 
     for action_key, label in stage_actions:
+        if action_key in {"complete_stage", "complete_process"}:
+            completion_action = (action_key, label)
+        else:
+            primary_actions.append((action_key, label))
+
+    for action_key, label in primary_actions:
         callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
         if callback_template is None:
             continue
@@ -72,12 +80,30 @@ def process_card_keyboard(
             callback_data=callback_template.format(process_id=process_id),
         )
 
-    # Общие операции остаются доступными независимо от этапа.
-    builder.button(text="✏️ Переименовать", callback_data=f"process:rename:{process_id}")
-    builder.button(text="🔄 Изменить этап", callback_data=f"process:change-stage:{process_id}")
-    builder.button(text="← Мои процессы", callback_data="menu:drinks")
+    compact_action_count = 2
+    if completion_action is not None:
+        action_key, _label = completion_action
+        callback_template = PROCESS_ACTION_CALLBACKS.get(action_key)
+        if callback_template is not None:
+            builder.button(
+                text="✅ Завершить",
+                callback_data=callback_template.format(process_id=process_id),
+            )
+            compact_action_count += 1
+
+    # Служебные действия процесса держим в одной компактной строке.
+    builder.button(text="✏️ Имя", callback_data=f"process:rename:{process_id}")
+    builder.button(text="🔄 Этап", callback_data=f"process:change-stage:{process_id}")
+
+    # Навигация тоже не должна растягивать карточку по вертикали.
+    builder.button(text="← Процессы", callback_data="menu:drinks")
     builder.button(text="🏠 Меню", callback_data="menu:main")
-    builder.adjust(1)
+
+    builder.adjust(
+        *([1] * len(primary_actions)),
+        compact_action_count,
+        2,
+    )
     return builder.as_markup()
 
 
