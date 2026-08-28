@@ -79,10 +79,14 @@ def test_stage_selector_only_offers_predefined_stages() -> None:
     assert all(callback != "process:stage:distillation" for _text, callback in buttons)
 
 
-def test_first_distillation_has_dedicated_result_action() -> None:
+def test_first_distillation_has_containers_and_dedicated_calculators() -> None:
     buttons = button_pairs("Первая перегонка")
 
-    assert ("✏️ Результат", "process:first-distillation:42") in buttons
+    assert ("🫙 Ёмкости", "process:first-distillation:42") in buttons
+    assert (
+        "🧮 Калькуляторы",
+        "process:first-distillation-calculators:42",
+    ) in buttons
     assert ("➡️ Следующий этап", "process:complete-stage:42") in buttons
 
 
