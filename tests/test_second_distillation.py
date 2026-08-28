@@ -51,8 +51,10 @@ def test_dilution_to_30_percent() -> None:
 
 
 def test_beginner_charge_guidance_recommends_25_to_30_percent() -> None:
-    assert "25-30%" in charge_recommendation(Decimal("35"))
-    assert "удобная стартовая цель - 30%" in charge_recommendation(Decimal("35"))
+    guidance = charge_recommendation(Decimal("35"))
+
+    assert "25-30%" in guidance
+    assert "Удобная стартовая цель - 30%" in guidance
     assert "рекомендуемом" in charge_recommendation(Decimal("28"))
 
 
