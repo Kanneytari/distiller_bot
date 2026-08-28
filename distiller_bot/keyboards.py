@@ -8,6 +8,7 @@ PROCESS_ACTION_CALLBACKS: dict[str, str] = {
     "measure": "process:measure:{process_id}",
     "note": "process:note:{process_id}",
     "calculators": "process:calculators:{process_id}",
+    "sugar_wash": "process:sugar-wash:{process_id}",
     # Завершение обычного этапа переиспользует существующий выбор нового этапа.
     "complete_stage": "process:complete-stage:{process_id}",
     "complete_process": "process:complete:{process_id}",
@@ -69,7 +70,7 @@ def process_card_keyboard(
     for action_key, label in stage_actions:
         if action_key in {"complete_stage", "complete_process"}:
             completion_action = (action_key, label)
-        elif action_key in {"note", "calculators"}:
+        elif action_key in {"note", "calculators", "sugar_wash"}:
             secondary_actions.append((action_key, label))
         else:
             primary_actions.append((action_key, label))
@@ -155,6 +156,40 @@ def process_input_cancel_keyboard(process_id: int | None = None) -> InlineKeyboa
 def process_calculators_keyboard(process_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="← К процессу", callback_data=f"process:view:{process_id}")
+    return builder.as_markup()
+
+
+def sugar_wash_menu_keyboard(process_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="🪣 По объёму",
+        callback_data=f"process:sugar-wash:{process_id}:volume",
+    )
+    builder.button(
+        text="🍬 По сахару",
+        callback_data=f"process:sugar-wash:{process_id}:sugar",
+    )
+    builder.button(
+        text="📈 Проверить состав",
+        callback_data=f"process:sugar-wash:{process_id}:check",
+    )
+    builder.button(text="← К процессу", callback_data=f"process:view:{process_id}")
+    builder.adjust(2, 1, 1)
+    return builder.as_markup()
+
+
+def sugar_wash_input_keyboard(process_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="❌ Отмена", callback_data=f"process:sugar-wash:{process_id}")
+    return builder.as_markup()
+
+
+def sugar_wash_result_keyboard(process_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="💾 Сохранить", callback_data=f"process:sugar-wash-save:{process_id}")
+    builder.button(text="↩️ Новый расчёт", callback_data=f"process:sugar-wash:{process_id}")
+    builder.button(text="← К процессу", callback_data=f"process:view:{process_id}")
+    builder.adjust(1, 2)
     return builder.as_markup()
 
 
