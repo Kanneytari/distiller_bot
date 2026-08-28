@@ -85,7 +85,7 @@ def compact_result_text(result: SugarWashResult) -> str:
     )
 
 
-async def get_latest_sugar_wash_calculation(
+async def get_latest_preparation_composition(
     session: AsyncSession,
     process_id: int,
 ) -> DrinkEvent | None:
@@ -93,7 +93,7 @@ async def get_latest_sugar_wash_calculation(
         select(DrinkEvent)
         .where(
             DrinkEvent.drink_id == process_id,
-            DrinkEvent.event_type == "sugar_wash_calculation",
+            DrinkEvent.event_type.in_(("preparation_composition", "sugar_wash_calculation")),
         )
         .order_by(DrinkEvent.created_at.desc(), DrinkEvent.id.desc())
         .limit(1)
@@ -161,7 +161,7 @@ async def sugar_wash_menu_handler(
     async with session_factory() as session:
         process = await get_owned_process(session, process_id, callback.from_user.id)
         latest_event = (
-            await get_latest_sugar_wash_calculation(session, process_id)
+            await get_latest_preparation_composition(session, process_id)
             if process is not None
             else None
         )
