@@ -55,6 +55,18 @@ STAGE_DEFINITIONS: dict[str, StageDefinition] = {
             StageAction("complete_stage", "✅ Завершить вторую перегонку"),
         ),
     ),
+    # Legacy-тип нужен только для уже сохранённых процессов.
+    # Новые клавиатуры больше не позволяют выбрать общую "Перегонку".
+    "distillation": StageDefinition(
+        title="Перегонка",
+        icon="⚗️",
+        actions=(
+            StageAction("measure", "📏 Записать результат"),
+            StageAction("note", "📝 Заметка"),
+            StageAction("calculators", "🧮 Калькуляторы"),
+            StageAction("complete_stage", "✅ Завершить перегонку"),
+        ),
+    ),
     "drink_preparation": StageDefinition(
         title="Подготовка напитка",
         icon="💧",
@@ -92,9 +104,6 @@ STAGE_TITLES: dict[str, str] = {
 }
 
 LEGACY_STAGE_TYPES: dict[str, str] = {
-    "Перегонка": "first_distillation",
-    "Перегонка #1": "first_distillation",
-    "Перегонка #2": "second_distillation",
     "Разбавление": "drink_preparation",
     "Выдержка": "drink_preparation",
     "Готово": "bottling",
